@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=ui-redesign-1" />
+  <link rel="stylesheet" href="style.css?v=chart-section-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -56,6 +56,7 @@
 
         <nav class="desktop-nav">
           <button class="nav-link active" data-target="dashboardSection"><span>⌂</span>Dashboard</button>
+          <button class="nav-link" data-target="chartSection"><span>◔</span>Chart</button>
           <button class="nav-link" data-target="budgetSection"><span>◎</span>Budget</button>
           <button class="nav-link" data-target="categorySection"><span>▦</span>Kategori</button>
           <button class="nav-link" data-target="expenseSection"><span>＋</span>Pengeluaran</button>
@@ -127,20 +128,16 @@
             <div class="progress-track"><div id="budgetBar" class="progress-fill"></div></div>
           </div>
 
-          <div class="grid-2 chart-grid">
-            <article class="panel chart-panel">
-              <div class="panel-head">
-                <h3>Pengeluaran per Kategori</h3>
+          <article class="panel chart-preview-panel">
+            <div class="chart-preview-copy">
+              <span class="mini-badge">Analisis</span>
+              <div>
+                <h3>Lihat grafik pengeluaran</h3>
+                <small>Chart dipisahkan agar dashboard tetap ringan dan rapi di HP.</small>
               </div>
-              <div class="chart-box"><canvas id="categoryChart"></canvas></div>
-            </article>
-            <article class="panel chart-panel">
-              <div class="panel-head">
-                <h3>Pengeluaran per Bulan</h3>
-              </div>
-              <div class="chart-box"><canvas id="monthChart"></canvas></div>
-            </article>
-          </div>
+            </div>
+            <button class="btn primary small" data-jump="chartSection">Buka Chart</button>
+          </article>
 
           <article class="panel">
             <div class="panel-head">
@@ -152,6 +149,39 @@
             </div>
             <div id="recentList" class="recent-list"></div>
           </article>
+        </section>
+
+        <section id="chartSection" class="page-section chart-page-section">
+          <div class="section-title-card">
+            <div>
+              <p class="eyebrow">Analisis Pengeluaran</p>
+              <h2>Chart Keuangan</h2>
+              <small>Lihat pola pengeluaran berdasarkan kategori dan bulan.</small>
+            </div>
+            <button class="btn ghost small" data-jump="expenseSection">Tambah Pengeluaran</button>
+          </div>
+
+          <div class="chart-page-grid">
+            <article class="panel chart-panel chart-card-large">
+              <div class="panel-head chart-title-head">
+                <div>
+                  <h3>Pengeluaran per Kategori</h3>
+                  <small>Distribusi total pengeluaran dari tiap kategori.</small>
+                </div>
+              </div>
+              <div class="chart-box doughnut-box"><canvas id="categoryChart"></canvas></div>
+            </article>
+
+            <article class="panel chart-panel chart-card-large">
+              <div class="panel-head chart-title-head">
+                <div>
+                  <h3>Pengeluaran per Bulan</h3>
+                  <small>Total pengeluaran yang dicatat setiap bulan.</small>
+                </div>
+              </div>
+              <div class="chart-box bar-box"><canvas id="monthChart"></canvas></div>
+            </article>
+          </div>
         </section>
 
         <section id="budgetSection" class="page-section">
@@ -334,6 +364,7 @@
 
       <nav class="mobile-bottom-nav" aria-label="Navigasi utama">
         <button class="nav-link active" data-target="dashboardSection"><span>⌂</span><small>Home</small></button>
+        <button class="nav-link" data-target="chartSection"><span>◔</span><small>Chart</small></button>
         <button class="nav-link" data-target="budgetSection"><span>◎</span><small>Budget</small></button>
         <button class="nav-link" data-target="categorySection"><span>▦</span><small>Kategori</small></button>
         <button class="nav-link" data-target="expenseSection"><span>＋</span><small>Catat</small></button>
@@ -345,7 +376,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="config.js?v=ui-redesign-1"></script>
-  <script src="app.js?v=ui-redesign-1"></script>
+  <script src="config.js?v=chart-section-1"></script>
+  <script src="app.js?v=chart-section-1"></script>
 </body>
 </html>

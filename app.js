@@ -350,6 +350,15 @@ function switchSection(targetId) {
   document.querySelectorAll('.nav-link').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.target === targetId);
   });
+
+  if (targetId === 'chartSection') {
+    // Chart berada di halaman terpisah. Resize setelah section aktif supaya ukuran canvas pas di HP.
+    setTimeout(() => {
+      if (categoryChart) categoryChart.resize();
+      if (monthChart) monthChart.resize();
+    }, 80);
+  }
+
   if (window.innerWidth <= 760) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -505,42 +514,63 @@ function renderCharts() {
   if (categoryChart) categoryChart.destroy();
   if (monthChart) monthChart.destroy();
 
-  const formatter = (value) => rupiah(value);
+  const categoryCanvas = document.getElementById('categoryChart');
+  const monthCanvas = document.getElementById('monthChart');
+  if (!categoryCanvas || !monthCanvas || typeof Chart === 'undefined') return;
 
-  categoryChart = new Chart(document.getElementById('categoryChart'), {
+  const formatter = (value) => rupiah(value);
+  const hasCategoryData = categoryValues.length > 0;
+  const hasMonthData = monthValues.length > 0;
+
+  categoryChart = new Chart(categoryCanvas, {
     type: 'doughnut',
     data: {
-      labels: categoryLabels.length ? categoryLabels : ['Belum Ada Data'],
+      labels: hasCategoryData ? categoryLabels : ['Belum Ada Data'],
       datasets: [{
-        data: categoryValues.length ? categoryValues : [1],
+        data: hasCategoryData ? categoryValues : [1],
         borderWidth: 0,
+        hoverOffset: 6,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      cutout: '58%',
+      layout: { padding: 4 },
       plugins: {
-        legend: { position: 'bottom' },
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 12,
+            usePointStyle: true,
+            font: { size: window.innerWidth <= 760 ? 10 : 12, weight: '600' },
+          },
+        },
         tooltip: {
-          callbacks: { label: (ctx) => `${ctx.label}: ${formatter(ctx.raw)}` },
+          callbacks: { label: (ctx) => `${ctx.label}: ${hasCategoryData ? formatter(ctx.raw) : 'Belum ada data'}` },
         },
       },
     },
   });
 
-  monthChart = new Chart(document.getElementById('monthChart'), {
+  monthChart = new Chart(monthCanvas, {
     type: 'bar',
     data: {
-      labels: monthLabels.length ? monthLabels : ['Belum Ada Data'],
+      labels: hasMonthData ? monthLabels : ['Belum Ada Data'],
       datasets: [{
         label: 'Pengeluaran',
-        data: monthValues.length ? monthValues : [0],
+        data: hasMonthData ? monthValues : [0],
         borderWidth: 0,
+        borderRadius: 12,
+        maxBarThickness: window.innerWidth <= 760 ? 46 : 72,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 8, right: 4, left: 0, bottom: 0 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -548,14 +578,30 @@ function renderCharts() {
         },
       },
       scales: {
-        y: {
+        x: {
+          grid: { display: false },
           ticks: {
-            callback: (value) => new Intl.NumberFormat('id-ID').format(value),
+            maxRotation: 0,
+            autoSkip: true,
+            font: { size: window.innerWidth <= 760 ? 10 : 12 },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            maxTicksLimit: window.innerWidth <= 760 ? 5 : 6,
+            callback: (value) => new Intl.NumberFormat('id-ID', { notation: value >= 1000000 ? 'compact' : 'standard' }).format(value),
+            font: { size: window.innerWidth <= 760 ? 10 : 12 },
           },
         },
       },
     },
   });
+
+  setTimeout(() => {
+    if (categoryChart) categoryChart.resize();
+    if (monthChart) monthChart.resize();
+  }, 80);
 }
 
 function renderApp() {

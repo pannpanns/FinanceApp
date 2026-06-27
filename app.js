@@ -6,6 +6,13 @@ const USERS = [
 const LEGACY_STORAGE_KEY = "financeflow_data_v1";
 const STORAGE_PREFIX = "financeflow_data_v2_";
 const SESSION_KEY = "financeflow_logged_in_user";
+const APP_CONFIG_KEY = "financeflow_app_config_v1";
+
+// Optional: setelah deploy Google Apps Script, kamu boleh tempel URL /exec di sini.
+// Kalau diisi, akun eka/tes bisa langsung mengambil data dari Google Sheet di perangkat mana pun.
+// Contoh: const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycb.../exec";
+const GOOGLE_WEB_APP_URL = "";
+const CLOUD_SAVE_DELAY = 700;
 
 const defaultData = {
   budgets: {},
@@ -27,6 +34,8 @@ const state = {
   activeMonth: getCurrentMonth(),
   search: "",
   activeUser: null,
+  cloudSaveTimer: null,
+  isLoadingCloud: false,
 };
 
 const rupiahFormatter = new Intl.NumberFormat("id-ID", {
@@ -92,6 +101,7 @@ const els = {
   sheetSyncEnabled: document.getElementById("sheetSyncEnabled"),
   sheetStatus: document.getElementById("sheetStatus"),
   testSheetBtn: document.getElementById("testSheetBtn"),
+  loadCloudBtn: document.getElementById("loadCloudBtn"),
   syncAllBtn: document.getElementById("syncAllBtn"),
   openSheetDashboardBtn: document.getElementById("openSheetDashboardBtn"),
 };
@@ -143,13 +153,14 @@ function bindEvents() {
   els.resetBtn.addEventListener("click", resetData);
   els.sheetForm.addEventListener("submit", handleSheetSettingsSubmit);
   els.testSheetBtn.addEventListener("click", testSheetSync);
+  if (els.loadCloudBtn) els.loadCloudBtn.addEventListener("click", () => loadCloudDataForActiveUser({ force: true, showToast: true }));
   els.syncAllBtn.addEventListener("click", syncAllExpensesToSheet);
   els.openSheetDashboardBtn.addEventListener("click", openSheetDashboard);
 
   window.addEventListener("resize", () => drawExpenseChart());
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
@@ -161,7 +172,7 @@ function handleLogin(event) {
     state.data = ensureDataShape(loadData());
     state.activeMonth = getCurrentMonth();
     state.search = "";
-    saveData();
+    saveData({ skipCloud: true });
     fillMonthOptions();
     resetCategoryForm();
     resetExpenseForm();
@@ -169,6 +180,7 @@ function handleLogin(event) {
     els.loginError.textContent = "";
     showApp();
     toast(`Login berhasil. Selamat datang, ${user.name}!`);
+    await loadCloudDataForActiveUser({ showToast: true });
   } else {
     els.loginError.textContent = "Username atau password salah.";
   }
@@ -191,8 +203,9 @@ function showCorrectPageBySession() {
   if (user) {
     state.activeUser = user;
     state.data = ensureDataShape(loadData());
-    saveData();
+    saveData({ skipCloud: true });
     showApp();
+    loadCloudDataForActiveUser({ showToast: false });
   } else {
     state.activeUser = null;
     state.data = cloneData(defaultData);
@@ -704,21 +717,26 @@ function resetData() {
 }
 
 
-function handleSheetSettingsSubmit(event) {
+async function handleSheetSettingsSubmit(event) {
   event.preventDefault();
 
   state.data.settings.sheetWebAppUrl = els.sheetWebAppUrl.value.trim();
   state.data.settings.sheetSecret = els.sheetSecret.value.trim() || defaultData.settings.sheetSecret;
   state.data.settings.sheetSyncEnabled = els.sheetSyncEnabled.checked;
+  saveAppConfig(state.data.settings);
   saveData();
   renderSheetSettings();
   toast("Pengaturan Google Spreadsheet berhasil disimpan.");
+
+  if (isSheetSyncEnabled()) {
+    await loadCloudDataForActiveUser({ force: true, showToast: true });
+  }
 }
 
 function renderSheetSettings() {
   if (!els.sheetForm) return;
 
-  const settings = state.data.settings || defaultData.settings;
+  const settings = getEffectiveSettings();
   els.sheetWebAppUrl.value = settings.sheetWebAppUrl || "";
   els.sheetSecret.value = settings.sheetSecret || defaultData.settings.sheetSecret;
   els.sheetSyncEnabled.checked = Boolean(settings.sheetSyncEnabled);
@@ -726,12 +744,12 @@ function renderSheetSettings() {
   const ready = isSheetSyncEnabled();
   els.sheetStatus.className = `sync-status ${ready ? "success" : "warning"}`;
   els.sheetStatus.innerHTML = ready
-    ? `Sinkronisasi aktif. Setiap tambah, update, atau hapus pengeluaran akan dikirim ke Google Spreadsheet.<br><a class="sync-link" href="${escapeHtml(settings.sheetWebAppUrl)}" target="_blank" rel="noopener">Buka dashboard modern Apps Script</a>`
-    : "Sinkronisasi belum aktif. Isi URL Web App, samakan Secret Key, lalu aktifkan sinkronisasi.";
+    ? `Cloud mode aktif. Data budget, kategori, dan pengeluaran disimpan berdasarkan akun <strong>${escapeHtml(state.activeUser?.username || "-")}</strong> di Google Spreadsheet.<br><a class="sync-link" href="${escapeHtml(settings.sheetWebAppUrl)}" target="_blank" rel="noopener">Buka dashboard modern Apps Script</a>`
+    : "Cloud mode belum aktif. Isi URL Web App, samakan Secret Key, lalu aktifkan sinkronisasi agar data akun bisa dibuka dari perangkat mana saja.";
 }
 
 function openSheetDashboard() {
-  const url = els.sheetWebAppUrl.value.trim() || state.data.settings?.sheetWebAppUrl || "";
+  const url = els.sheetWebAppUrl.value.trim() || getEffectiveSettings().sheetWebAppUrl || "";
 
   if (!url) {
     toast("Isi URL Web App terlebih dahulu.");
@@ -742,7 +760,7 @@ function openSheetDashboard() {
 }
 
 function isSheetSyncEnabled() {
-  const settings = state.data.settings || {};
+  const settings = getEffectiveSettings();
   return Boolean(settings.sheetSyncEnabled && settings.sheetWebAppUrl);
 }
 
@@ -806,7 +824,7 @@ async function syncExpenseToSheet(expense, action) {
 }
 
 async function postToGoogleSheet(payload) {
-  const settings = state.data.settings || defaultData.settings;
+  const settings = getEffectiveSettings();
 
   if (!settings.sheetWebAppUrl) {
     return { ok: false, error: "URL Web App kosong." };
@@ -837,7 +855,7 @@ async function postToGoogleSheet(payload) {
 
 function loadData() {
   const user = state.activeUser || getSessionUser();
-  if (!user) return cloneData(defaultData);
+  if (!user) return applyEffectiveSettingsToData(cloneData(defaultData));
 
   try {
     const storageKey = getUserStorageKey(user.username);
@@ -849,16 +867,114 @@ function loadData() {
       if (saved) localStorage.setItem(storageKey, saved);
     }
 
-    return saved ? JSON.parse(saved) : cloneData(defaultData);
+    return applyEffectiveSettingsToData(saved ? JSON.parse(saved) : cloneData(defaultData));
   } catch (error) {
-    return cloneData(defaultData);
+    return applyEffectiveSettingsToData(cloneData(defaultData));
   }
 }
 
-function saveData() {
+function saveData(options = {}) {
   const user = state.activeUser || getSessionUser();
   if (!user) return;
+  state.data = applyEffectiveSettingsToData(ensureDataShape(state.data));
   localStorage.setItem(getUserStorageKey(user.username), JSON.stringify(state.data));
+
+  if (!options.skipCloud) {
+    queueCloudSave();
+  }
+}
+
+function queueCloudSave() {
+  if (state.isLoadingCloud || !state.activeUser || !isSheetSyncEnabled()) return;
+
+  clearTimeout(state.cloudSaveTimer);
+  state.cloudSaveTimer = setTimeout(() => {
+    saveFullAccountDataToCloud();
+  }, CLOUD_SAVE_DELAY);
+}
+
+async function saveFullAccountDataToCloud() {
+  if (!state.activeUser || !isSheetSyncEnabled()) return { ok: false };
+
+  const dataToSave = applyEffectiveSettingsToData(ensureDataShape(state.data));
+  return postToGoogleSheet({
+    type: "userData",
+    action: "SAVE_ACCOUNT_DATA",
+    userData: dataToSave,
+  });
+}
+
+async function loadCloudDataForActiveUser(options = {}) {
+  const { force = false, showToast = false } = options;
+  if (!state.activeUser) return;
+
+  const settings = getEffectiveSettings();
+  if (!settings.sheetWebAppUrl || (!settings.sheetSyncEnabled && !force)) return;
+
+  try {
+    state.isLoadingCloud = true;
+    const response = await jsonpRequest(settings.sheetWebAppUrl, {
+      action: "load",
+      secret: settings.sheetSecret,
+      username: state.activeUser.username,
+    });
+
+    if (!response || !response.ok) {
+      if (showToast) toast(response?.error || "Gagal mengambil data akun dari Google Spreadsheet.");
+      return;
+    }
+
+    state.data = applyEffectiveSettingsToData(ensureDataShape(response.data));
+    saveData({ skipCloud: true });
+    fillMonthOptions();
+    resetCategoryForm();
+    resetExpenseForm();
+    renderAll();
+
+    if (showToast) toast("Data akun berhasil dimuat dari Google Spreadsheet.");
+  } catch (error) {
+    console.error("Cloud load error:", error);
+    if (showToast) toast("Gagal memuat data cloud. Cek URL Web App dan izin deployment.");
+  } finally {
+    state.isLoadingCloud = false;
+  }
+}
+
+function jsonpRequest(baseUrl, params = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `financeFlowJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Request timeout."));
+    }, 15000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+    }
+
+    window[callbackName] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    try {
+      const url = new URL(baseUrl);
+      Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+      url.searchParams.set("callback", callbackName);
+      script.src = url.toString();
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("JSONP request failed."));
+      };
+      document.body.appendChild(script);
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
 }
 
 function getSessionUser() {
@@ -868,6 +984,46 @@ function getSessionUser() {
 
 function getUserStorageKey(username) {
   return `${STORAGE_PREFIX}${username}`;
+}
+
+function getEffectiveSettings() {
+  const appConfig = readAppConfig();
+  const dataSettings = state.data?.settings && typeof state.data.settings === "object" ? state.data.settings : {};
+  const merged = {
+    ...defaultData.settings,
+    ...dataSettings,
+    ...appConfig,
+  };
+
+  if (GOOGLE_WEB_APP_URL) {
+    merged.sheetWebAppUrl = GOOGLE_WEB_APP_URL;
+    merged.sheetSyncEnabled = true;
+  }
+
+  return merged;
+}
+
+function applyEffectiveSettingsToData(data) {
+  const safeData = ensureDataShape(data);
+  safeData.settings = getEffectiveSettings();
+  return safeData;
+}
+
+function readAppConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(APP_CONFIG_KEY) || "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveAppConfig(settings) {
+  localStorage.setItem(APP_CONFIG_KEY, JSON.stringify({
+    sheetWebAppUrl: settings.sheetWebAppUrl || "",
+    sheetSecret: settings.sheetSecret || defaultData.settings.sheetSecret,
+    sheetSyncEnabled: Boolean(settings.sheetSyncEnabled),
+  }));
 }
 
 function ensureDataShape(data) {

@@ -35,11 +35,6 @@
           </label>
           <button type="submit" class="btn btn-primary full">Masuk</button>
           <p id="loginError" class="form-error"></p>
-          <div class="login-hint">
-            <span>Demo login</span>
-            <strong>eka / eka123</strong>
-            <strong>tes / tes123</strong>
-          </div>
         </form>
       </div>
     </section>
@@ -268,7 +263,7 @@
             <div class="panel-header">
               <div>
                 <h2>Integrasi Google Spreadsheet</h2>
-                <p>Aktifkan agar setiap tambah, update, atau hapus pengeluaran otomatis terkirim ke Google Spreadsheet.</p>
+                <p>Aktifkan cloud mode agar data akun bisa dibuka dari perangkat mana saja melalui Google Spreadsheet.</p>
               </div>
             </div>
             <form id="sheetForm" class="form-grid sheet-form">
@@ -287,6 +282,7 @@
               <div class="form-actions wide">
                 <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
                 <button type="button" id="testSheetBtn" class="btn btn-light">Test Kirim ke Sheet</button>
+                <button type="button" id="loadCloudBtn" class="btn btn-light">Muat Data Akun dari Sheet</button>
                 <button type="button" id="syncAllBtn" class="btn btn-light">Kirim Semua Pengeluaran</button>
                 <button type="button" id="openSheetDashboardBtn" class="btn btn-light">Buka Dashboard Script</button>
               </div>
@@ -315,12 +311,12 @@
                 <span>Pilih Deploy → New deployment → Web app → Anyone.</span>
               </div>
               <div class="guide-card">
-                <strong>4. Dashboard Otomatis</strong>
-                <span>Buka URL /exec untuk melihat dashboard modern dari Apps Script.</span>
+                <strong>4. Cloud Akun</strong>
+                <span>Budget, kategori, dan pengeluaran disimpan per username di sheet UsersData.</span>
               </div>
               <div class="guide-card">
                 <strong>5. Tempel URL</strong>
-                <span>Masukkan URL /exec ke form integrasi, lalu aktifkan sinkronisasi.</span>
+                <span>Masukkan URL /exec, aktifkan sinkronisasi, lalu klik Muat Data Akun dari Sheet.</span>
               </div>
             </div>
           </article>
@@ -331,7 +327,7 @@
             <div class="panel-header">
               <div>
                 <h2>Backup Data</h2>
-                <p>Karena GitHub Pages tidak menggunakan database, data tersimpan di browser. Gunakan backup agar data bisa dipindahkan ke perangkat lain.</p>
+                <p>Jika cloud mode aktif, Google Spreadsheet menjadi penyimpanan utama per akun. Export/import JSON tetap disediakan sebagai backup tambahan.</p>
               </div>
             </div>
             <div class="backup-actions">

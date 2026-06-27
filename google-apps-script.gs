@@ -17,6 +17,7 @@ const SECRET_KEY = 'eka-finance-secret';
 const EXPENSE_SHEET_NAME = 'Pengeluaran';
 const LOG_SHEET_NAME = 'Log';
 const DASHBOARD_SHEET_NAME = 'Dashboard';
+const USER_DATA_SHEET_NAME = 'UsersData';
 
 const EXPENSE_HEADERS = [
   'Timestamp Sync',
@@ -45,6 +46,19 @@ const LOG_HEADERS = [
   'Raw Payload'
 ];
 
+const USER_DATA_HEADERS = [
+  'Username',
+  'Nama',
+  'Password Demo',
+  'Data JSON',
+  'Updated At'
+];
+
+const DEFAULT_ACCOUNTS = [
+  { username: 'eka', password: 'eka123', name: 'Eka' },
+  { username: 'tes', password: 'tes123', name: 'Tes' }
+];
+
 function doPost(e) {
   try {
     const payload = parsePayload_(e);
@@ -55,6 +69,13 @@ function doPost(e) {
 
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     setupSpreadsheet_(spreadsheet);
+
+    if (payload.type === 'userData') {
+      saveUserData_(spreadsheet, payload.username, payload.userData);
+      appendLog_(spreadsheet, payload, 'Account data saved to UsersData.');
+      refreshDashboardSheet_(spreadsheet);
+      return json_({ ok: true, message: 'Account data saved.' });
+    }
 
     if (payload.type === 'expense') {
       upsertExpense_(spreadsheet, payload);
@@ -77,11 +98,17 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   setupSpreadsheet_(spreadsheet);
-  refreshDashboardSheet_(spreadsheet);
 
+  const params = (e && e.parameter) ? e.parameter : {};
+
+  if (params.action === 'load') {
+    return handleUserDataLoad_(spreadsheet, params);
+  }
+
+  refreshDashboardSheet_(spreadsheet);
   const dashboardData = getDashboardData_(spreadsheet);
   return HtmlService
     .createHtmlOutput(buildDashboardHtml_(dashboardData))
@@ -121,9 +148,12 @@ function parsePayload_(e) {
 function setupSpreadsheet_(spreadsheet) {
   const expenseSheet = ensureSheet_(spreadsheet, EXPENSE_SHEET_NAME, EXPENSE_HEADERS);
   const logSheet = ensureSheet_(spreadsheet, LOG_SHEET_NAME, LOG_HEADERS);
+  const userDataSheet = ensureSheet_(spreadsheet, USER_DATA_SHEET_NAME, USER_DATA_HEADERS);
   ensureDashboardSheet_(spreadsheet);
+  ensureDefaultUsers_(userDataSheet);
   formatExpenseSheet_(expenseSheet);
   formatLogSheet_(logSheet);
+  formatUserDataSheet_(userDataSheet);
 }
 
 function ensureSheet_(spreadsheet, sheetName, headers) {
@@ -150,6 +180,158 @@ function ensureDashboardSheet_(spreadsheet) {
     sheet = spreadsheet.insertSheet(DASHBOARD_SHEET_NAME, 0);
   }
   return sheet;
+}
+
+function ensureDefaultUsers_(sheet) {
+  DEFAULT_ACCOUNTS.forEach((account) => {
+    const row = findRowByUsername_(sheet, account.username);
+    if (!row) {
+      sheet.appendRow([
+        account.username,
+        account.name,
+        account.password,
+        JSON.stringify(defaultFinanceData_()),
+        new Date()
+      ]);
+    }
+  });
+}
+
+function handleUserDataLoad_(spreadsheet, params) {
+  const callback = params.callback || 'callback';
+
+  if (params.secret !== SECRET_KEY) {
+    return jsonp_(callback, { ok: false, error: 'Unauthorized. Secret Key tidak cocok.' });
+  }
+
+  const username = String(params.username || '').trim();
+  if (!username) {
+    return jsonp_(callback, { ok: false, error: 'Username kosong.' });
+  }
+
+  const account = DEFAULT_ACCOUNTS.find((item) => item.username === username);
+  if (!account) {
+    return jsonp_(callback, { ok: false, error: 'Akun tidak terdaftar.' });
+  }
+
+  const sheet = spreadsheet.getSheetByName(USER_DATA_SHEET_NAME);
+  let row = findRowByUsername_(sheet, username);
+  if (!row) {
+    ensureDefaultUsers_(sheet);
+    row = findRowByUsername_(sheet, username);
+  }
+
+  const rawData = row ? sheet.getRange(row, 4).getValue() : '';
+  let data = defaultFinanceData_();
+  if (rawData) {
+    try {
+      data = JSON.parse(String(rawData));
+    } catch (error) {
+      data = defaultFinanceData_();
+    }
+  }
+
+  return jsonp_(callback, {
+    ok: true,
+    username: username,
+    data: data,
+    updatedAt: row ? formatDateTimeValue_(sheet.getRange(row, 5).getValue()) : ''
+  });
+}
+
+function saveUserData_(spreadsheet, username, userData) {
+  username = String(username || '').trim();
+  if (!username) throw new Error('Username kosong.');
+
+  const account = DEFAULT_ACCOUNTS.find((item) => item.username === username);
+  if (!account) throw new Error('Akun tidak terdaftar.');
+
+  const sheet = spreadsheet.getSheetByName(USER_DATA_SHEET_NAME);
+  const safeData = normalizeUserData_(userData);
+  const rowValues = [
+    account.username,
+    account.name,
+    account.password,
+    JSON.stringify(safeData),
+    new Date()
+  ];
+
+  const targetRow = findRowByUsername_(sheet, username);
+  if (targetRow) {
+    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+
+  formatUserDataSheet_(sheet);
+}
+
+function normalizeUserData_(data) {
+  const safe = data && typeof data === 'object' ? data : {};
+  return {
+    budgets: safe.budgets && typeof safe.budgets === 'object' ? safe.budgets : {},
+    settings: safe.settings && typeof safe.settings === 'object' ? safe.settings : {},
+    categories: Array.isArray(safe.categories) ? safe.categories : defaultFinanceData_().categories,
+    expenses: Array.isArray(safe.expenses) ? safe.expenses : []
+  };
+}
+
+function defaultFinanceData_() {
+  return {
+    budgets: {},
+    settings: {
+      sheetWebAppUrl: '',
+      sheetSecret: SECRET_KEY,
+      sheetSyncEnabled: true
+    },
+    categories: [
+      { id: 'cat_makan', name: 'Makan', color: '#6366f1' },
+      { id: 'cat_transportasi', name: 'Transportasi', color: '#14b8a6' },
+      { id: 'cat_belanja', name: 'Belanja', color: '#f59e0b' }
+    ],
+    expenses: []
+  };
+}
+
+function findRowByUsername_(sheet, username) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return null;
+
+  const usernames = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let index = 0; index < usernames.length; index += 1) {
+    if (String(usernames[index][0]) === String(username)) {
+      return index + 2;
+    }
+  }
+
+  return null;
+}
+
+function formatUserDataSheet_(sheet) {
+  if (!sheet) return;
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  const lastColumn = USER_DATA_HEADERS.length;
+  sheet.setFrozenRows(1);
+  sheet.setTabColor('#6366f1');
+  sheet.getRange(1, 1, 1, lastColumn)
+    .setFontWeight('bold')
+    .setFontColor('#ffffff')
+    .setBackground('#312e81')
+    .setHorizontalAlignment('center')
+    .setWrap(true);
+  sheet.getRange(1, 1, lastRow, lastColumn)
+    .setBorder(true, true, true, true, true, true, '#e5e7eb', SpreadsheetApp.BorderStyle.SOLID)
+    .setVerticalAlignment('middle')
+    .setWrap(true);
+  if (lastRow > 1) {
+    sheet.getRange(2, 5, lastRow - 1, 1).setNumberFormat('dd mmm yyyy hh:mm');
+  }
+  sheet.setColumnWidth(1, 130);
+  sheet.setColumnWidth(2, 140);
+  sheet.setColumnWidth(3, 140);
+  sheet.setColumnWidth(4, 700);
+  sheet.setColumnWidth(5, 170);
+  ensureFilter_(sheet, lastRow, lastColumn);
 }
 
 function upsertExpense_(spreadsheet, payload) {
@@ -575,6 +757,14 @@ function json_(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function jsonp_(callback, data) {
+  const safeCallback = String(callback || 'callback').replace(/[^a-zA-Z0-9_.$]/g, '');
+  const body = safeCallback + '(' + JSON.stringify(data) + ');';
+  return ContentService
+    .createTextOutput(body)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function buildDashboardHtml_(data) {

@@ -1,1238 +1,821 @@
-const USERS = [
-  { username: "eka", password: "eka123", name: "Eka" },
-  { username: "tes", password: "tes123", name: "Tes" },
-];
-
-const LEGACY_STORAGE_KEY = "financeflow_data_v1";
-const STORAGE_PREFIX = "financeflow_data_v2_";
-const SESSION_KEY = "financeflow_logged_in_user";
-const APP_CONFIG_KEY = "financeflow_app_config_v1";
-
-// Optional: setelah deploy Google Apps Script, kamu boleh tempel URL /exec di sini.
-// Kalau diisi, akun eka/tes bisa langsung mengambil data dari Google Sheet di perangkat mana pun.
-// Contoh: const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycb.../exec";
-const GOOGLE_WEB_APP_URL = "";
-const CLOUD_SAVE_DELAY = 700;
-
-const defaultData = {
-  budgets: {},
-  settings: {
-    sheetWebAppUrl: "",
-    sheetSecret: "eka-finance-secret",
-    sheetSyncEnabled: false,
-  },
-  categories: [
-    { id: cryptoId(), name: "Makan", color: "#6366f1" },
-    { id: cryptoId(), name: "Transportasi", color: "#14b8a6" },
-    { id: cryptoId(), name: "Belanja", color: "#f59e0b" },
-  ],
-  expenses: [],
-};
-
-const state = {
-  data: cloneData(defaultData),
-  activeMonth: getCurrentMonth(),
-  search: "",
-  activeUser: null,
-  cloudSaveTimer: null,
-  isLoadingCloud: false,
-};
-
-const numberFormatter = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 0,
-});
-
-const shortDateFormatter = new Intl.DateTimeFormat("id-ID", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
 const els = {
-  loginPage: document.getElementById("loginPage"),
-  appPage: document.getElementById("appPage"),
-  loginForm: document.getElementById("loginForm"),
-  loginError: document.getElementById("loginError"),
-  welcomeUser: document.getElementById("welcomeUser"),
-  logoutBtn: document.getElementById("logoutBtn"),
-  navLinks: document.querySelectorAll(".nav-link"),
-  sections: document.querySelectorAll(".page-section"),
-  monthFilter: document.getElementById("monthFilter"),
-  openExpenseShortcut: document.getElementById("openExpenseShortcut"),
-  budgetForm: document.getElementById("budgetForm"),
-  budgetMonth: document.getElementById("budgetMonth"),
-  budgetAmount: document.getElementById("budgetAmount"),
-  categoryForm: document.getElementById("categoryForm"),
-  categoryId: document.getElementById("categoryId"),
-  categoryName: document.getElementById("categoryName"),
-  categoryColor: document.getElementById("categoryColor"),
-  categorySubmitBtn: document.getElementById("categorySubmitBtn"),
-  cancelCategoryEdit: document.getElementById("cancelCategoryEdit"),
-  categoryTable: document.getElementById("categoryTable"),
-  expenseForm: document.getElementById("expenseForm"),
-  expenseId: document.getElementById("expenseId"),
-  expenseDate: document.getElementById("expenseDate"),
-  expenseCategory: document.getElementById("expenseCategory"),
-  expenseTitle: document.getElementById("expenseTitle"),
-  expenseAmount: document.getElementById("expenseAmount"),
-  expenseNote: document.getElementById("expenseNote"),
-  expenseSubmitBtn: document.getElementById("expenseSubmitBtn"),
-  cancelExpenseEdit: document.getElementById("cancelExpenseEdit"),
-  expenseTable: document.getElementById("expenseTable"),
-  expenseSearch: document.getElementById("expenseSearch"),
-  summaryBudget: document.getElementById("summaryBudget"),
-  summaryExpense: document.getElementById("summaryExpense"),
-  summaryRemaining: document.getElementById("summaryRemaining"),
-  summaryPercent: document.getElementById("summaryPercent"),
-  remainingNote: document.getElementById("remainingNote"),
-  usageProgress: document.getElementById("usageProgress"),
-  latestExpenses: document.getElementById("latestExpenses"),
-  expenseChart: document.getElementById("expenseChart"),
-  chartLegend: document.getElementById("chartLegend"),
-  toast: document.getElementById("toast"),
-  exportBtn: document.getElementById("exportBtn"),
-  importInput: document.getElementById("importInput"),
-  resetBtn: document.getElementById("resetBtn"),
-  sheetForm: document.getElementById("sheetForm"),
-  sheetWebAppUrl: document.getElementById("sheetWebAppUrl"),
-  sheetSecret: document.getElementById("sheetSecret"),
-  sheetSyncEnabled: document.getElementById("sheetSyncEnabled"),
-  sheetStatus: document.getElementById("sheetStatus"),
-  testSheetBtn: document.getElementById("testSheetBtn"),
-  loadCloudBtn: document.getElementById("loadCloudBtn"),
-  syncAllBtn: document.getElementById("syncAllBtn"),
-  openSheetDashboardBtn: document.getElementById("openSheetDashboardBtn"),
+  loginPage: document.getElementById('loginPage'),
+  mainPage: document.getElementById('mainPage'),
+  loginForm: document.getElementById('loginForm'),
+  apiUrlInput: document.getElementById('apiUrlInput'),
+  usernameInput: document.getElementById('usernameInput'),
+  passwordInput: document.getElementById('passwordInput'),
+  loginMessage: document.getElementById('loginMessage'),
+  testApiBtn: document.getElementById('testApiBtn'),
+  connectionDetails: document.getElementById('connectionDetails'),
+  connectionStatusText: document.getElementById('connectionStatusText'),
+  sidebarUser: document.getElementById('sidebarUser'),
+  greetingTitle: document.getElementById('greetingTitle'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  refreshBtn: document.getElementById('refreshBtn'),
+  syncStatus: document.getElementById('syncStatus'),
+  toast: document.getElementById('toast'),
+  statBudget: document.getElementById('statBudget'),
+  statSpent: document.getElementById('statSpent'),
+  statRemaining: document.getElementById('statRemaining'),
+  remainingNote: document.getElementById('remainingNote'),
+  statCount: document.getElementById('statCount'),
+  budgetPercent: document.getElementById('budgetPercent'),
+  budgetBar: document.getElementById('budgetBar'),
+  recentList: document.getElementById('recentList'),
+  budgetForm: document.getElementById('budgetForm'),
+  budgetInput: document.getElementById('budgetInput'),
+  categoryForm: document.getElementById('categoryForm'),
+  categoryFormTitle: document.getElementById('categoryFormTitle'),
+  categoryIdInput: document.getElementById('categoryIdInput'),
+  categoryNameInput: document.getElementById('categoryNameInput'),
+  categoryBudgetInput: document.getElementById('categoryBudgetInput'),
+  cancelCategoryEditBtn: document.getElementById('cancelCategoryEditBtn'),
+  categoryTable: document.getElementById('categoryTable'),
+  expenseForm: document.getElementById('expenseForm'),
+  expenseFormTitle: document.getElementById('expenseFormTitle'),
+  expenseIdInput: document.getElementById('expenseIdInput'),
+  expenseTitleInput: document.getElementById('expenseTitleInput'),
+  expenseAmountInput: document.getElementById('expenseAmountInput'),
+  expenseCategoryInput: document.getElementById('expenseCategoryInput'),
+  expenseDateInput: document.getElementById('expenseDateInput'),
+  expenseNoteInput: document.getElementById('expenseNoteInput'),
+  cancelExpenseEditBtn: document.getElementById('cancelExpenseEditBtn'),
+  expenseTable: document.getElementById('expenseTable'),
+  searchExpenseInput: document.getElementById('searchExpenseInput'),
+  filterCategoryInput: document.getElementById('filterCategoryInput'),
+  apiForm: document.getElementById('apiForm'),
+  settingsApiUrlInput: document.getElementById('settingsApiUrlInput'),
+  settingsTestBtn: document.getElementById('settingsTestBtn'),
+  exportBtn: document.getElementById('exportBtn'),
+  importInput: document.getElementById('importInput'),
 };
 
-init();
+const STORAGE = {
+  token: 'financeflow_token',
+  user: 'financeflow_user',
+  apiUrl: 'financeflow_api_url',
+};
 
-function init() {
-  bindEvents();
-  showCorrectPageBySession();
-  fillMonthOptions();
-  els.budgetMonth.value = state.activeMonth;
-  els.expenseDate.value = getCurrentDateInput();
-  renderAll();
+let state = {
+  token: localStorage.getItem(STORAGE.token) || '',
+  user: JSON.parse(localStorage.getItem(STORAGE.user) || 'null'),
+  apiUrl: localStorage.getItem(STORAGE.apiUrl) || window.FINANCEFLOW_API_URL || '',
+  data: {
+    budget: 0,
+    categories: [],
+    expenses: [],
+  },
+};
+
+let categoryChart = null;
+let monthChart = null;
+let saveTimer = null;
+
+function rupiah(value) {
+  const number = Number(value) || 0;
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(number);
 }
 
-function bindEvents() {
-  els.loginForm.addEventListener("submit", handleLogin);
-  els.logoutBtn.addEventListener("click", handleLogout);
-
-  els.navLinks.forEach((link) => {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      switchSection(link.dataset.target);
-    });
-  });
-
-  els.monthFilter.addEventListener("change", () => {
-    state.activeMonth = els.monthFilter.value;
-    els.budgetMonth.value = state.activeMonth;
-    renderAll();
-  });
-
-  els.openExpenseShortcut.addEventListener("click", () => {
-    switchSection("expenseSection");
-    els.expenseTitle.focus();
-  });
-
-  els.budgetForm.addEventListener("submit", handleBudgetSubmit);
-  els.categoryForm.addEventListener("submit", handleCategorySubmit);
-  els.cancelCategoryEdit.addEventListener("click", resetCategoryForm);
-  els.expenseForm.addEventListener("submit", handleExpenseSubmit);
-  els.cancelExpenseEdit.addEventListener("click", resetExpenseForm);
-  els.expenseSearch.addEventListener("input", () => {
-    state.search = els.expenseSearch.value.trim().toLowerCase();
-    renderExpenses();
-  });
-  els.exportBtn.addEventListener("click", exportData);
-  els.importInput.addEventListener("change", importData);
-  els.resetBtn.addEventListener("click", resetData);
-  els.sheetForm.addEventListener("submit", handleSheetSettingsSubmit);
-  els.testSheetBtn.addEventListener("click", testSheetSync);
-  if (els.loadCloudBtn) els.loadCloudBtn.addEventListener("click", () => loadCloudDataForActiveUser({ force: true, showToast: true }));
-  els.syncAllBtn.addEventListener("click", syncAllExpensesToSheet);
-  els.openSheetDashboardBtn.addEventListener("click", openSheetDashboard);
-
-  setupCurrencyInput(els.budgetAmount);
-  setupCurrencyInput(els.expenseAmount);
-
-  window.addEventListener("resize", () => drawExpenseChart());
+function formatNumberOnly(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(digits));
 }
 
-async function handleLogin(event) {
-  event.preventDefault();
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value.trim();
-  const user = USERS.find((item) => item.username === username && item.password === password);
+function parseRupiah(value) {
+  return Number(String(value || '').replace(/\D/g, '')) || 0;
+}
 
-  if (user) {
-    clearTimeout(state.cloudSaveTimer);
-    localStorage.setItem(SESSION_KEY, user.username);
-    state.activeUser = user;
-    state.data = ensureDataShape(loadData());
-    state.activeMonth = getCurrentMonth();
-    state.search = "";
-    saveData({ skipCloud: true });
-    fillMonthOptions();
-    resetCategoryForm();
-    resetExpenseForm();
-    renderAll();
-    els.loginError.textContent = "";
-    showApp();
-    toast(`Login berhasil. Selamat datang, ${user.name}!`);
-    await loadCloudDataForActiveUser({ showToast: true });
+function formatRupiahInput(input) {
+  const number = parseRupiah(input.value);
+  input.value = number ? rupiah(number) : '';
+}
+
+function uid(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function showToast(message) {
+  els.toast.textContent = message;
+  els.toast.classList.remove('hidden');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => els.toast.classList.add('hidden'), 2600);
+}
+
+function setMessage(message, type = 'info') {
+  els.loginMessage.textContent = message;
+  els.loginMessage.className = `message ${type === 'error' ? 'error' : ''}`;
+  els.loginMessage.classList.remove('hidden');
+}
+
+function clearMessage() {
+  els.loginMessage.classList.add('hidden');
+  els.loginMessage.textContent = '';
+}
+
+function setSyncStatus(text, kind = 'ok') {
+  els.syncStatus.textContent = text;
+  if (kind === 'error') {
+    els.syncStatus.style.background = '#fef2f2';
+    els.syncStatus.style.color = '#b91c1c';
+  } else if (kind === 'saving') {
+    els.syncStatus.style.background = '#fffbeb';
+    els.syncStatus.style.color = '#b45309';
   } else {
-    els.loginError.textContent = "Username atau password salah.";
+    els.syncStatus.style.background = '#ecfdf5';
+    els.syncStatus.style.color = '#047857';
   }
 }
 
-function handleLogout() {
-  clearTimeout(state.cloudSaveTimer);
-  localStorage.removeItem(SESSION_KEY);
-  state.activeUser = null;
-  state.data = cloneData(defaultData);
-  state.activeMonth = getCurrentMonth();
-  state.search = "";
-  els.loginForm.reset();
-  els.loginPage.classList.remove("hidden");
-  els.appPage.classList.add("hidden");
+function normalizeApiUrl(url) {
+  return String(url || '').trim().replace(/\/+$/, '');
 }
 
-function showCorrectPageBySession() {
-  const user = getSessionUser();
-
-  if (user) {
-    state.activeUser = user;
-    state.data = ensureDataShape(loadData());
-    saveData({ skipCloud: true });
-    showApp();
-    loadCloudDataForActiveUser({ showToast: false });
-  } else {
-    state.activeUser = null;
-    state.data = cloneData(defaultData);
-    els.loginPage.classList.remove("hidden");
-    els.appPage.classList.add("hidden");
-  }
+function getApiUrl() {
+  return normalizeApiUrl(state.apiUrl || els.apiUrlInput?.value || els.settingsApiUrlInput?.value || window.FINANCEFLOW_API_URL || '');
 }
 
-function showApp() {
-  els.loginPage.classList.add("hidden");
-  els.appPage.classList.remove("hidden");
-  if (els.welcomeUser && state.activeUser) {
-    els.welcomeUser.textContent = `Selamat datang, ${state.activeUser.name}`;
-  }
-}
+async function apiFetch(path, options = {}) {
+  const base = getApiUrl();
+  if (!base) throw new Error('Aplikasi belum siap digunakan. Hubungi admin untuk mengaktifkan server.');
 
-function switchSection(sectionId) {
-  els.sections.forEach((section) => {
-    section.classList.toggle("active-section", section.id === sectionId);
-  });
-
-  els.navLinks.forEach((link) => {
-    link.classList.toggle("active", link.dataset.target === sectionId);
-  });
-}
-
-function handleBudgetSubmit(event) {
-  event.preventDefault();
-  const month = els.budgetMonth.value;
-  const amount = parseRupiahInput(els.budgetAmount.value);
-
-  if (!month || amount < 0) {
-    toast("Budget tidak valid.");
-    return;
-  }
-
-  state.data.budgets[month] = amount;
-  state.activeMonth = month;
-  saveData();
-  fillMonthOptions();
-  els.monthFilter.value = state.activeMonth;
-  renderAll();
-  toast("Budget berhasil disimpan.");
-}
-
-function handleCategorySubmit(event) {
-  event.preventDefault();
-  const name = els.categoryName.value.trim();
-  const color = els.categoryColor.value;
-  const id = els.categoryId.value;
-
-  if (!name) {
-    toast("Nama kategori wajib diisi.");
-    return;
-  }
-
-  const duplicate = state.data.categories.some(
-    (category) => category.name.toLowerCase() === name.toLowerCase() && category.id !== id
-  );
-
-  if (duplicate) {
-    toast("Nama kategori sudah ada.");
-    return;
-  }
-
-  if (id) {
-    const category = state.data.categories.find((item) => item.id === id);
-    if (category) {
-      category.name = name;
-      category.color = color;
-      toast("Kategori berhasil diperbarui.");
-    }
-  } else {
-    state.data.categories.push({ id: cryptoId(), name, color });
-    toast("Kategori berhasil ditambahkan.");
-  }
-
-  saveData();
-  resetCategoryForm();
-  renderAll();
-}
-
-function editCategory(id) {
-  const category = state.data.categories.find((item) => item.id === id);
-  if (!category) return;
-
-  els.categoryId.value = category.id;
-  els.categoryName.value = category.name;
-  els.categoryColor.value = category.color;
-  els.categorySubmitBtn.textContent = "Update Kategori";
-  els.cancelCategoryEdit.classList.remove("hidden");
-  switchSection("categorySection");
-  els.categoryName.focus();
-}
-
-function deleteCategory(id) {
-  const isUsed = state.data.expenses.some((expense) => expense.categoryId === id);
-  if (isUsed) {
-    toast("Kategori tidak bisa dihapus karena sudah dipakai di pengeluaran.");
-    return;
-  }
-
-  if (!confirm("Yakin ingin menghapus kategori ini?")) return;
-
-  state.data.categories = state.data.categories.filter((category) => category.id !== id);
-  saveData();
-  renderAll();
-  toast("Kategori berhasil dihapus.");
-}
-
-function resetCategoryForm() {
-  els.categoryForm.reset();
-  els.categoryId.value = "";
-  els.categoryColor.value = "#6366f1";
-  els.categorySubmitBtn.textContent = "Tambah Kategori";
-  els.cancelCategoryEdit.classList.add("hidden");
-}
-
-async function handleExpenseSubmit(event) {
-  event.preventDefault();
-
-  if (state.data.categories.length === 0) {
-    toast("Buat kategori terlebih dahulu.");
-    switchSection("categorySection");
-    return;
-  }
-
-  const id = els.expenseId.value;
-  const payload = {
-    date: els.expenseDate.value,
-    categoryId: els.expenseCategory.value,
-    title: els.expenseTitle.value.trim(),
-    amount: parseRupiahInput(els.expenseAmount.value),
-    note: els.expenseNote.value.trim(),
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
   };
 
-  if (!payload.date || !payload.categoryId || !payload.title || payload.amount <= 0) {
-    toast("Lengkapi data pengeluaran dengan benar.");
+  if (state.token) {
+    headers.Authorization = `Bearer ${state.token}`;
+  }
+
+  const response = await fetch(`${base}/api${path}`, {
+    ...options,
+    headers,
+  });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (error) {
+    data = { ok: false, message: 'Response server tidak valid.' };
+  }
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.message || `HTTP ${response.status}`);
+  }
+
+  return data;
+}
+
+async function testApiConnection() {
+  try {
+    const base = getApiUrl();
+    if (!base) throw new Error('Server aplikasi belum diatur.');
+    updateConnectionUi('checking');
+    const response = await fetch(`${base}/api/health`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.message || 'Koneksi gagal.');
+    updateConnectionUi('ready');
+    showToast('Koneksi server berhasil.');
+    return true;
+  } catch (error) {
+    updateConnectionUi('error');
+    openConnectionDetails();
+    showToast(error.message || 'Koneksi server gagal.');
+    return false;
+  }
+}
+
+
+function updateConnectionUi(kind = 'idle') {
+  if (!els.connectionStatusText) return;
+
+  const hasUrl = Boolean(state.apiUrl);
+  if (!hasUrl) {
+    els.connectionStatusText.textContent = 'Server belum diatur';
+    els.connectionStatusText.className = 'connection-pill error';
     return;
   }
 
-  let savedExpense = null;
-  let sheetAction = "CREATE";
+  if (kind === 'checking') {
+    els.connectionStatusText.textContent = 'Mengecek server...';
+    els.connectionStatusText.className = 'connection-pill';
+  } else if (kind === 'error') {
+    els.connectionStatusText.textContent = 'Server bermasalah';
+    els.connectionStatusText.className = 'connection-pill error';
+  } else {
+    els.connectionStatusText.textContent = 'Server siap';
+    els.connectionStatusText.className = 'connection-pill ready';
+  }
+}
 
-  if (id) {
-    const expense = state.data.expenses.find((item) => item.id === id);
-    if (expense) {
-      Object.assign(expense, payload, { updatedAt: new Date().toISOString() });
-      savedExpense = expense;
-      sheetAction = "UPDATE";
+function openConnectionDetails() {
+  if (els.connectionDetails) els.connectionDetails.open = true;
+}
+
+function saveApiUrl(url) {
+  state.apiUrl = normalizeApiUrl(url);
+  localStorage.setItem(STORAGE.apiUrl, state.apiUrl);
+  if (els.apiUrlInput) els.apiUrlInput.value = state.apiUrl;
+  if (els.settingsApiUrlInput) els.settingsApiUrlInput.value = state.apiUrl;
+  updateConnectionUi();
+  if (state.apiUrl && els.connectionDetails) els.connectionDetails.open = false;
+}
+
+function saveSession(token, user) {
+  state.token = token;
+  state.user = user;
+  localStorage.setItem(STORAGE.token, token);
+  localStorage.setItem(STORAGE.user, JSON.stringify(user));
+}
+
+function clearSession() {
+  state.token = '';
+  state.user = null;
+  state.data = { budget: 0, categories: [], expenses: [] };
+  localStorage.removeItem(STORAGE.token);
+  localStorage.removeItem(STORAGE.user);
+}
+
+function sanitizeLoadedData(data) {
+  return {
+    budget: Number(data?.budget) || 0,
+    categories: Array.isArray(data?.categories) ? data.categories : [],
+    expenses: Array.isArray(data?.expenses) ? data.expenses : [],
+  };
+}
+
+async function login(username, password) {
+  const result = await apiFetch('/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  saveSession(result.token, result.user);
+  state.data = sanitizeLoadedData(result.data);
+  renderApp();
+  showMainPage();
+  showToast('Login berhasil. Data berhasil dimuat.');
+}
+
+async function loadDataFromCloud() {
+  setSyncStatus('Memuat...', 'saving');
+  try {
+    const result = await apiFetch('/data');
+    state.data = sanitizeLoadedData(result.data);
+    renderApp();
+    setSyncStatus('Tersinkron', 'ok');
+    showToast('Data berhasil dimuat.');
+  } catch (error) {
+    setSyncStatus('Gagal muat', 'error');
+    showToast(error.message);
+  }
+}
+
+async function saveDataToCloud(immediate = false) {
+  const run = async () => {
+    setSyncStatus('Menyimpan...', 'saving');
+    try {
+      await apiFetch('/data', {
+        method: 'PUT',
+        body: JSON.stringify(state.data),
+      });
+      setSyncStatus('Tersimpan', 'ok');
+    } catch (error) {
+      setSyncStatus('Gagal simpan', 'error');
+      showToast(error.message);
     }
-  } else {
-    savedExpense = { id: cryptoId(), createdAt: new Date().toISOString(), updatedAt: "", ...payload };
-    state.data.expenses.push(savedExpense);
+  };
+
+  if (immediate) {
+    clearTimeout(saveTimer);
+    return run();
   }
 
-  if (!savedExpense) {
-    toast("Data pengeluaran tidak ditemukan.");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(run, 550);
+}
+
+function showLoginPage() {
+  els.loginPage.classList.remove('hidden');
+  els.mainPage.classList.add('hidden');
+}
+
+function showMainPage() {
+  els.loginPage.classList.add('hidden');
+  els.mainPage.classList.remove('hidden');
+}
+
+function switchSection(targetId) {
+  document.querySelectorAll('.page-section').forEach((section) => {
+    section.classList.toggle('active', section.id === targetId);
+  });
+  document.querySelectorAll('.nav-link').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.target === targetId);
+  });
+}
+
+function categoryName(categoryId) {
+  return state.data.categories.find((cat) => cat.id === categoryId)?.name || 'Tanpa Kategori';
+}
+
+function expenseTotal() {
+  return state.data.expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+}
+
+function expensesByCategory() {
+  const result = new Map();
+  state.data.expenses.forEach((expense) => {
+    const name = categoryName(expense.categoryId);
+    result.set(name, (result.get(name) || 0) + (Number(expense.amount) || 0));
+  });
+  return result;
+}
+
+function expensesByMonth() {
+  const result = new Map();
+  state.data.expenses.forEach((expense) => {
+    const key = String(expense.date || '').slice(0, 7) || 'Tanpa Tanggal';
+    result.set(key, (result.get(key) || 0) + (Number(expense.amount) || 0));
+  });
+  return new Map([...result.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+function categorySpent(categoryId) {
+  return state.data.expenses
+    .filter((expense) => expense.categoryId === categoryId)
+    .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+}
+
+function renderStats() {
+  const budget = Number(state.data.budget) || 0;
+  const spent = expenseTotal();
+  const remaining = budget - spent;
+  const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+
+  els.statBudget.textContent = rupiah(budget);
+  els.statSpent.textContent = rupiah(spent);
+  els.statRemaining.textContent = rupiah(remaining);
+  els.statCount.textContent = state.data.expenses.length;
+  els.budgetPercent.textContent = `${percent}%`;
+  els.budgetBar.style.width = `${percent}%`;
+  els.remainingNote.textContent = remaining < 0 ? 'Budget terlewati' : 'Masih aman';
+  els.remainingNote.style.color = remaining < 0 ? '#b91c1c' : '#047857';
+  els.budgetInput.value = budget ? rupiah(budget) : '';
+}
+
+function renderRecent() {
+  const items = [...state.data.expenses]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 6);
+
+  if (!items.length) {
+    els.recentList.innerHTML = '<div class="empty-state">Belum ada pengeluaran.</div>';
     return;
   }
 
-  state.activeMonth = payload.date.slice(0, 7);
-  saveData();
-  fillMonthOptions();
-  els.monthFilter.value = state.activeMonth;
-  resetExpenseForm();
-  renderAll();
-
-  if (isSheetSyncEnabled()) {
-    const result = await syncExpenseToSheet(savedExpense, sheetAction);
-    toast(result.ok ? "Pengeluaran tersimpan dan dikirim ke Google Sheet." : "Pengeluaran tersimpan lokal, tetapi gagal dikirim ke Sheet.");
-  } else {
-    toast(sheetAction === "UPDATE" ? "Pengeluaran berhasil diperbarui." : "Pengeluaran berhasil ditambahkan.");
-  }
-}
-
-function editExpense(id) {
-  const expense = state.data.expenses.find((item) => item.id === id);
-  if (!expense) return;
-
-  els.expenseId.value = expense.id;
-  els.expenseDate.value = expense.date;
-  els.expenseCategory.value = expense.categoryId;
-  els.expenseTitle.value = expense.title;
-  els.expenseAmount.value = formatRupiahInput(expense.amount);
-  els.expenseNote.value = expense.note || "";
-  els.expenseSubmitBtn.textContent = "Update Pengeluaran";
-  els.cancelExpenseEdit.classList.remove("hidden");
-  switchSection("expenseSection");
-  els.expenseTitle.focus();
-}
-
-async function deleteExpense(id) {
-  const deletedExpense = state.data.expenses.find((expense) => expense.id === id);
-  if (!deletedExpense) return;
-
-  if (!confirm("Yakin ingin menghapus pengeluaran ini?")) return;
-  state.data.expenses = state.data.expenses.filter((expense) => expense.id !== id);
-  saveData();
-  renderAll();
-
-  if (isSheetSyncEnabled()) {
-    const result = await syncExpenseToSheet(deletedExpense, "DELETE");
-    toast(result.ok ? "Pengeluaran dihapus dan statusnya dikirim ke Google Sheet." : "Pengeluaran dihapus lokal, tetapi gagal dikirim ke Sheet.");
-  } else {
-    toast("Pengeluaran berhasil dihapus.");
-  }
-}
-
-function resetExpenseForm() {
-  els.expenseForm.reset();
-  els.expenseId.value = "";
-  els.expenseDate.value = getCurrentDateInput();
-  els.expenseSubmitBtn.textContent = "Tambah Pengeluaran";
-  els.cancelExpenseEdit.classList.add("hidden");
-  renderCategoryOptions();
-}
-
-function renderAll() {
-  renderBudgetForm();
-  renderSummary();
-  renderCategoryOptions();
-  renderCategories();
-  renderExpenses();
-  renderLatestExpenses();
-  drawExpenseChart();
-  renderSheetSettings();
-}
-
-function renderBudgetForm() {
-  els.budgetMonth.value = state.activeMonth;
-  els.budgetAmount.value = formatRupiahInput(state.data.budgets[state.activeMonth] || "");
-}
-
-function renderSummary() {
-  const budget = Number(state.data.budgets[state.activeMonth] || 0);
-  const totalExpense = getMonthlyExpenses().reduce((total, expense) => total + Number(expense.amount), 0);
-  const remaining = budget - totalExpense;
-  const percent = budget > 0 ? Math.min((totalExpense / budget) * 100, 999) : 0;
-
-  els.summaryBudget.textContent = formatRupiah(budget);
-  els.summaryExpense.textContent = formatRupiah(totalExpense);
-  els.summaryRemaining.textContent = formatRupiah(remaining);
-  els.summaryPercent.textContent = `${Math.round(percent)}%`;
-  els.usageProgress.style.width = `${Math.min(percent, 100)}%`;
-
-  if (budget === 0) {
-    els.remainingNote.textContent = "Budget belum diatur";
-    els.summaryRemaining.style.color = "var(--text)";
-  } else if (remaining < 0) {
-    els.remainingNote.textContent = "Melebihi budget";
-    els.summaryRemaining.style.color = "var(--danger)";
-  } else {
-    els.remainingNote.textContent = "Masih aman";
-    els.summaryRemaining.style.color = "var(--success)";
-  }
+  els.recentList.innerHTML = items.map((item) => `
+    <div class="recent-item">
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(categoryName(item.categoryId))} • ${escapeHtml(item.date)}</small>
+      </div>
+      <div class="amount">${rupiah(item.amount)}</div>
+    </div>
+  `).join('');
 }
 
 function renderCategoryOptions() {
-  if (state.data.categories.length === 0) {
-    els.expenseCategory.innerHTML = `<option value="">Belum ada kategori</option>`;
-    return;
-  }
+  const options = state.data.categories.map((cat) => (
+    `<option value="${escapeAttr(cat.id)}">${escapeHtml(cat.name)}</option>`
+  )).join('');
 
-  els.expenseCategory.innerHTML = state.data.categories
-    .map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`)
-    .join("");
+  els.expenseCategoryInput.innerHTML = options || '<option value="">Buat kategori dulu</option>';
+  els.filterCategoryInput.innerHTML = '<option value="all">Semua Kategori</option>' + options;
 }
 
-function renderCategories() {
-  if (state.data.categories.length === 0) {
-    els.categoryTable.innerHTML = `<tr><td colspan="4"><div class="empty-state">Belum ada kategori.</div></td></tr>`;
+function renderCategoryTable() {
+  if (!state.data.categories.length) {
+    els.categoryTable.innerHTML = '<tr><td colspan="4"><div class="empty-state">Belum ada kategori.</div></td></tr>';
     return;
   }
 
-  els.categoryTable.innerHTML = state.data.categories
-    .map((category) => {
-      const total = state.data.expenses
-        .filter((expense) => expense.categoryId === category.id)
-        .reduce((sum, expense) => sum + Number(expense.amount), 0);
-
-      return `
-        <tr>
-          <td><span class="color-dot" style="background:${escapeHtml(category.color)}"></span></td>
-          <td>${escapeHtml(category.name)}</td>
-          <td>${formatRupiah(total)}</td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn btn-light" onclick="editCategory('${category.id}')">Edit</button>
-              <button class="btn btn-danger" onclick="deleteCategory('${category.id}')">Hapus</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-function renderExpenses() {
-  const expenses = getMonthlyExpenses()
-    .filter((expense) => {
-      if (!state.search) return true;
-      const category = getCategoryById(expense.categoryId)?.name || "";
-      return [expense.title, expense.note, category, expense.date]
-        .join(" ")
-        .toLowerCase()
-        .includes(state.search);
-    })
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  if (expenses.length === 0) {
-    els.expenseTable.innerHTML = `<tr><td colspan="6"><div class="empty-state">Belum ada pengeluaran pada bulan ini.</div></td></tr>`;
-    return;
-  }
-
-  els.expenseTable.innerHTML = expenses
-    .map((expense) => {
-      const category = getCategoryById(expense.categoryId);
-      return `
-        <tr>
-          <td>${formatDate(expense.date)}</td>
-          <td>${escapeHtml(expense.title)}</td>
-          <td>
-            <span class="category-pill">
-              <span class="color-dot" style="background:${escapeHtml(category?.color || "#9ca3af")}"></span>
-              ${escapeHtml(category?.name || "Kategori dihapus")}
-            </span>
-          </td>
-          <td>${formatRupiah(expense.amount)}</td>
-          <td>${escapeHtml(expense.note || "-")}</td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn btn-light" onclick="editExpense('${expense.id}')">Edit</button>
-              <button class="btn btn-danger" onclick="deleteExpense('${expense.id}')">Hapus</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-function renderLatestExpenses() {
-  const latest = getMonthlyExpenses()
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
-
-  if (latest.length === 0) {
-    els.latestExpenses.innerHTML = `<div class="empty-state">Belum ada transaksi terbaru.</div>`;
-    return;
-  }
-
-  els.latestExpenses.innerHTML = latest
-    .map((expense) => {
-      const category = getCategoryById(expense.categoryId);
-      return `
-        <div class="latest-item">
-          <div>
-            <strong>${escapeHtml(expense.title)}</strong>
-            <small>${formatDate(expense.date)} · ${escapeHtml(category?.name || "Kategori dihapus")}</small>
+  els.categoryTable.innerHTML = state.data.categories.map((cat) => {
+    const spent = categorySpent(cat.id);
+    return `
+      <tr>
+        <td>${escapeHtml(cat.name)}</td>
+        <td>${cat.budget ? rupiah(cat.budget) : '-'}</td>
+        <td>${rupiah(spent)}</td>
+        <td>
+          <div class="action-cell">
+            <button class="btn small" data-edit-category="${escapeAttr(cat.id)}">Edit</button>
+            <button class="btn danger small" data-delete-category="${escapeAttr(cat.id)}">Hapus</button>
           </div>
-          <span>${formatRupiah(expense.amount)}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderExpenseTable() {
+  const search = els.searchExpenseInput.value.trim().toLowerCase();
+  const filter = els.filterCategoryInput.value || 'all';
+  const items = [...state.data.expenses]
+    .filter((expense) => {
+      const matchSearch = !search || [expense.title, expense.note, categoryName(expense.categoryId)]
+        .join(' ')
+        .toLowerCase()
+        .includes(search);
+      const matchCategory = filter === 'all' || expense.categoryId === filter;
+      return matchSearch && matchCategory;
+    })
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  if (!items.length) {
+    els.expenseTable.innerHTML = '<tr><td colspan="5"><div class="empty-state">Belum ada pengeluaran yang cocok.</div></td></tr>';
+    return;
+  }
+
+  els.expenseTable.innerHTML = items.map((expense) => `
+    <tr>
+      <td>${escapeHtml(expense.date)}</td>
+      <td>${escapeHtml(expense.title)}</td>
+      <td>${escapeHtml(categoryName(expense.categoryId))}</td>
+      <td>${rupiah(expense.amount)}</td>
+      <td>
+        <div class="action-cell">
+          <button class="btn small" data-edit-expense="${escapeAttr(expense.id)}">Edit</button>
+          <button class="btn danger small" data-delete-expense="${escapeAttr(expense.id)}">Hapus</button>
         </div>
-      `;
-    })
-    .join("");
+      </td>
+    </tr>
+  `).join('');
 }
 
-function drawExpenseChart() {
-  const canvas = els.expenseChart;
-  const ctx = canvas.getContext("2d");
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(320, rect.width || 420) * dpr;
-  canvas.height = 300 * dpr;
-  ctx.scale(dpr, dpr);
+function renderCharts() {
+  const categoryMap = expensesByCategory();
+  const monthMap = expensesByMonth();
 
-  const width = canvas.width / dpr;
-  const height = canvas.height / dpr;
-  ctx.clearRect(0, 0, width, height);
+  const categoryLabels = [...categoryMap.keys()];
+  const categoryValues = [...categoryMap.values()];
+  const monthLabels = [...monthMap.keys()];
+  const monthValues = [...monthMap.values()];
 
-  const data = getExpenseByCategory();
-  const total = data.reduce((sum, item) => sum + item.total, 0);
+  if (categoryChart) categoryChart.destroy();
+  if (monthChart) monthChart.destroy();
 
-  if (total === 0) {
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "700 16px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Belum ada data pengeluaran", width / 2, height / 2);
-    els.chartLegend.innerHTML = "";
-    return;
-  }
+  const formatter = (value) => rupiah(value);
 
-  const centerX = width / 2;
-  const centerY = height / 2 - 6;
-  const radius = Math.min(width, height) * 0.34;
-  const innerRadius = radius * 0.58;
-  let startAngle = -Math.PI / 2;
-
-  data.forEach((item) => {
-    const sliceAngle = (item.total / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
-    ctx.closePath();
-    ctx.fillStyle = item.color;
-    ctx.fill();
-    startAngle += sliceAngle;
-  });
-
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-
-  ctx.fillStyle = "#111827";
-  ctx.font = "800 19px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(formatRupiah(total), centerX, centerY - 3);
-  ctx.fillStyle = "#6b7280";
-  ctx.font = "700 12px Inter, sans-serif";
-  ctx.fillText("Total", centerX, centerY + 18);
-
-  els.chartLegend.innerHTML = data
-    .map(
-      (item) => `
-      <div class="legend-item">
-        <span class="legend-dot" style="background:${escapeHtml(item.color)}"></span>
-        ${escapeHtml(item.name)} · ${formatRupiah(item.total)}
-      </div>`
-    )
-    .join("");
-}
-
-function getExpenseByCategory() {
-  return state.data.categories
-    .map((category) => {
-      const total = getMonthlyExpenses()
-        .filter((expense) => expense.categoryId === category.id)
-        .reduce((sum, expense) => sum + Number(expense.amount), 0);
-      return { name: category.name, color: category.color, total };
-    })
-    .filter((item) => item.total > 0)
-    .sort((a, b) => b.total - a.total);
-}
-
-function fillMonthOptions() {
-  const months = new Set([getCurrentMonth(), state.activeMonth, ...Object.keys(state.data.budgets)]);
-  state.data.expenses.forEach((expense) => months.add(expense.date.slice(0, 7)));
-
-  const sortedMonths = [...months].sort().reverse();
-  els.monthFilter.innerHTML = sortedMonths
-    .map((month) => `<option value="${month}">${formatMonthLabel(month)}</option>`)
-    .join("");
-  els.monthFilter.value = state.activeMonth;
-}
-
-function getMonthlyExpenses() {
-  return state.data.expenses.filter((expense) => expense.date?.startsWith(state.activeMonth));
-}
-
-function getCategoryById(id) {
-  return state.data.categories.find((category) => category.id === id);
-}
-
-function exportData() {
-  const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `financeflow-backup-${getCurrentDateInput()}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-  toast("Data berhasil diexport.");
-}
-
-function importData(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const imported = JSON.parse(reader.result);
-      state.data = ensureDataShape(imported);
-      saveData();
-      fillMonthOptions();
-      renderAll();
-      toast("Data berhasil diimport.");
-    } catch (error) {
-      toast("File JSON tidak valid.");
-    } finally {
-      event.target.value = "";
-    }
-  };
-  reader.readAsText(file);
-}
-
-function resetData() {
-  if (!confirm("Semua data budget, kategori, dan pengeluaran akan dihapus. Lanjutkan?")) return;
-  state.data = cloneData(defaultData);
-  state.activeMonth = getCurrentMonth();
-  saveData();
-  fillMonthOptions();
-  resetCategoryForm();
-  resetExpenseForm();
-  renderAll();
-  toast("Semua data berhasil direset.");
-}
-
-
-async function handleSheetSettingsSubmit(event) {
-  event.preventDefault();
-
-  state.data.settings.sheetWebAppUrl = els.sheetWebAppUrl.value.trim();
-  state.data.settings.sheetSecret = els.sheetSecret.value.trim() || defaultData.settings.sheetSecret;
-  state.data.settings.sheetSyncEnabled = els.sheetSyncEnabled.checked;
-  saveAppConfig(state.data.settings);
-  saveData();
-  renderSheetSettings();
-  toast("Pengaturan Google Spreadsheet berhasil disimpan.");
-
-  if (isSheetSyncEnabled()) {
-    await loadCloudDataForActiveUser({ force: true, showToast: true });
-  }
-}
-
-function renderSheetSettings() {
-  if (!els.sheetForm) return;
-
-  const settings = getEffectiveSettings();
-  els.sheetWebAppUrl.value = settings.sheetWebAppUrl || "";
-  els.sheetSecret.value = settings.sheetSecret || defaultData.settings.sheetSecret;
-  els.sheetSyncEnabled.checked = Boolean(settings.sheetSyncEnabled);
-
-  const ready = isSheetSyncEnabled();
-  els.sheetStatus.className = `sync-status ${ready ? "success" : "warning"}`;
-  els.sheetStatus.innerHTML = ready
-    ? `Cloud mode aktif. Data budget, kategori, dan pengeluaran disimpan berdasarkan akun <strong>${escapeHtml(state.activeUser?.username || "-")}</strong> di Google Spreadsheet.<br><a class="sync-link" href="${escapeHtml(settings.sheetWebAppUrl)}" target="_blank" rel="noopener">Buka dashboard modern Apps Script</a>`
-    : "Cloud mode belum aktif. Isi URL Web App, samakan Secret Key, lalu aktifkan sinkronisasi agar data akun bisa dibuka dari perangkat mana saja.";
-}
-
-function openSheetDashboard() {
-  const url = els.sheetWebAppUrl.value.trim() || getEffectiveSettings().sheetWebAppUrl || "";
-
-  if (!url) {
-    toast("Isi URL Web App terlebih dahulu.");
-    return;
-  }
-
-  window.open(url, "_blank", "noopener");
-}
-
-function isSheetSyncEnabled() {
-  const settings = getEffectiveSettings();
-  return Boolean(settings.sheetSyncEnabled && settings.sheetWebAppUrl);
-}
-
-async function testSheetSync() {
-  if (!isSheetSyncEnabled()) {
-    toast("Aktifkan sinkronisasi dan isi URL Web App terlebih dahulu.");
-    switchSection("sheetSection");
-    return;
-  }
-
-  const ping = await pingGoogleSheet();
-  if (!ping.ok) {
-    toast(ping.error || "Koneksi gagal. Pastikan URL /exec, Secret Key, dan izin deployment sudah benar.");
-    return;
-  }
-
-  const result = await postToGoogleSheet({
-    type: "test",
-    action: "TEST",
-    message: "Test koneksi dari FinanceFlow",
-  });
-
-  toast(result.ok ? "Koneksi berhasil. Cek sheet Log di Spreadsheet." : "Gagal mengirim test ke Google Sheet.");
-}
-
-async function pingGoogleSheet() {
-  const settings = getEffectiveSettings();
-
-  if (!settings.sheetWebAppUrl) {
-    return { ok: false, error: "URL Web App kosong." };
-  }
-
-  try {
-    return await jsonpRequest(settings.sheetWebAppUrl, {
-      action: "ping",
-      secret: settings.sheetSecret,
-      username: state.activeUser?.username || "",
-    });
-  } catch (error) {
-    console.error("Google Sheet ping error:", error);
-    return { ok: false, error: "Tidak bisa menghubungi Apps Script. Cek URL Web App yang berakhiran /exec." };
-  }
-}
-
-async function syncAllExpensesToSheet() {
-  if (!isSheetSyncEnabled()) {
-    toast("Aktifkan sinkronisasi dan isi URL Web App terlebih dahulu.");
-    switchSection("sheetSection");
-    return;
-  }
-
-  if (state.data.expenses.length === 0) {
-    toast("Belum ada pengeluaran untuk dikirim.");
-    return;
-  }
-
-  if (!confirm("Kirim semua data pengeluaran lokal ke Google Spreadsheet?")) return;
-
-  let successCount = 0;
-  for (const expense of state.data.expenses) {
-    const result = await syncExpenseToSheet(expense, "SYNC");
-    if (result.ok) successCount += 1;
-  }
-
-  toast(`${successCount} dari ${state.data.expenses.length} pengeluaran dikirim ke Google Sheet.`);
-}
-
-async function syncExpenseToSheet(expense, action) {
-  const category = getCategoryById(expense.categoryId);
-  const username = state.activeUser?.username || "";
-  return postToGoogleSheet({
-    username,
-    type: "expense",
-    action,
-    expense: {
-      id: expense.id,
-      date: expense.date,
-      month: expense.date?.slice(0, 7) || "",
-      categoryId: expense.categoryId,
-      categoryName: category?.name || "Kategori dihapus",
-      title: expense.title,
-      amount: Number(expense.amount || 0),
-      note: expense.note || "",
-      createdAt: expense.createdAt || "",
-      updatedAt: expense.updatedAt || "",
+  categoryChart = new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+      labels: categoryLabels.length ? categoryLabels : ['Belum Ada Data'],
+      datasets: [{
+        data: categoryValues.length ? categoryValues : [1],
+        borderWidth: 0,
+      }],
     },
-  });
-}
-
-async function postToGoogleSheet(payload) {
-  const settings = getEffectiveSettings();
-
-  if (!settings.sheetWebAppUrl) {
-    return { ok: false, error: "URL Web App kosong." };
-  }
-
-  const username = payload.username || state.activeUser?.username || "";
-  const fullPayload = {
-    secret: settings.sheetSecret,
-    app: "FinanceFlow",
-    sentAt: new Date().toISOString(),
-    ...payload,
-    username,
-  };
-
-  try {
-    // Hidden form POST lebih stabil untuk GitHub Pages -> Google Apps Script
-    // karena tidak terkena masalah CORS/preflight seperti fetch biasa.
-    await postToGoogleSheetByForm(settings.sheetWebAppUrl, fullPayload);
-    return { ok: true };
-  } catch (formError) {
-    console.error("Google Sheet form sync error:", formError);
-
-    // Fallback lama. Respons tidak bisa dibaca karena no-cors, tetapi POST tetap dicoba.
-    try {
-      await fetch(settings.sheetWebAppUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: { label: (ctx) => `${ctx.label}: ${formatter(ctx.raw)}` },
         },
-        body: JSON.stringify(fullPayload),
-      });
-      return { ok: true };
-    } catch (fetchError) {
-      console.error("Google Sheet fetch sync error:", fetchError);
-      return { ok: false, error: fetchError };
-    }
-  }
-}
-
-function postToGoogleSheetByForm(url, payload) {
-  return new Promise((resolve, reject) => {
-    if (!url || !url.includes("/exec")) {
-      reject(new Error("URL Web App harus URL deployment yang berakhiran /exec."));
-      return;
-    }
-
-    const iframeName = `financeflow_post_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const iframe = document.createElement("iframe");
-    const form = document.createElement("form");
-    const textarea = document.createElement("textarea");
-    let submitted = false;
-    let finished = false;
-
-    function cleanup() {
-      window.setTimeout(() => {
-        form.remove();
-        iframe.remove();
-      }, 250);
-    }
-
-    function finish() {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      resolve({ ok: true });
-    }
-
-    iframe.name = iframeName;
-    iframe.style.display = "none";
-    iframe.onload = () => {
-      if (submitted) finish();
-    };
-
-    form.method = "POST";
-    form.action = url;
-    form.target = iframeName;
-    form.enctype = "application/x-www-form-urlencoded";
-    form.style.display = "none";
-
-    textarea.name = "payload";
-    textarea.value = JSON.stringify(payload);
-    form.appendChild(textarea);
-
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-
-    try {
-      submitted = true;
-      form.submit();
-      // Apps Script kadang tidak memicu event load di iframe karena redirect internal.
-      // Setelah form dikirim, kita anggap request sudah masuk.
-      window.setTimeout(finish, 2200);
-    } catch (error) {
-      cleanup();
-      reject(error);
-    }
-  });
-}
-
-function loadData() {
-  const user = state.activeUser || getSessionUser();
-  if (!user) return applyEffectiveSettingsToData(cloneData(defaultData));
-
-  try {
-    const storageKey = getUserStorageKey(user.username);
-    let saved = localStorage.getItem(storageKey);
-
-    // Migrasi data versi lama ke akun eka agar data sebelumnya tetap aman.
-    if (!saved && user.username === "eka") {
-      saved = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (saved) localStorage.setItem(storageKey, saved);
-    }
-
-    return applyEffectiveSettingsToData(saved ? JSON.parse(saved) : cloneData(defaultData));
-  } catch (error) {
-    return applyEffectiveSettingsToData(cloneData(defaultData));
-  }
-}
-
-function saveData(options = {}) {
-  const user = state.activeUser || getSessionUser();
-  if (!user) return;
-  state.data = applyEffectiveSettingsToData(ensureDataShape(state.data));
-  localStorage.setItem(getUserStorageKey(user.username), JSON.stringify(state.data));
-
-  if (!options.skipCloud) {
-    queueCloudSave();
-  }
-}
-
-function queueCloudSave() {
-  if (state.isLoadingCloud || !state.activeUser || !isSheetSyncEnabled()) return;
-
-  const usernameSnapshot = state.activeUser.username;
-  const dataSnapshot = cloneData(state.data);
-
-  clearTimeout(state.cloudSaveTimer);
-  state.cloudSaveTimer = setTimeout(() => {
-    saveFullAccountDataToCloud(usernameSnapshot, dataSnapshot);
-  }, CLOUD_SAVE_DELAY);
-}
-
-async function saveFullAccountDataToCloud(usernameOverride = null, dataOverride = null) {
-  const username = usernameOverride || state.activeUser?.username || "";
-  if (!username || !isSheetSyncEnabled()) return { ok: false };
-
-  const rawData = dataOverride || state.data;
-  const dataToSave = applyEffectiveSettingsToData(ensureDataShape(rawData));
-  return postToGoogleSheet({
-    username,
-    type: "userData",
-    action: "SAVE_ACCOUNT_DATA",
-    userData: dataToSave,
-  });
-}
-
-async function loadCloudDataForActiveUser(options = {}) {
-  const { force = false, showToast = false } = options;
-  if (!state.activeUser) return;
-
-  const usernameSnapshot = state.activeUser.username;
-  const settings = getEffectiveSettings();
-  if (!settings.sheetWebAppUrl || (!settings.sheetSyncEnabled && !force)) return;
-
-  try {
-    state.isLoadingCloud = true;
-    const response = await jsonpRequest(settings.sheetWebAppUrl, {
-      action: "load",
-      secret: settings.sheetSecret,
-      username: usernameSnapshot,
-    });
-
-    if (!state.activeUser || state.activeUser.username !== usernameSnapshot) return;
-
-    if (!response || !response.ok) {
-      if (showToast) toast(response?.error || "Gagal mengambil data akun dari Google Spreadsheet.");
-      return;
-    }
-
-    if (response.username && response.username !== usernameSnapshot) {
-      if (showToast) toast("Data cloud ditolak karena username tidak sesuai.");
-      return;
-    }
-
-    state.data = applyEffectiveSettingsToData(ensureDataShape(response.data));
-    saveData({ skipCloud: true });
-    fillMonthOptions();
-    resetCategoryForm();
-    resetExpenseForm();
-    renderAll();
-
-    if (showToast) toast("Data akun berhasil dimuat dari Google Spreadsheet.");
-  } catch (error) {
-    console.error("Cloud load error:", error);
-    if (showToast) toast("Gagal memuat data cloud. Cek URL Web App dan izin deployment.");
-  } finally {
-    state.isLoadingCloud = false;
-  }
-}
-
-function jsonpRequest(baseUrl, params = {}) {
-  return new Promise((resolve, reject) => {
-    const callbackName = `financeFlowJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement("script");
-    const timeout = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("Request timeout."));
-    }, 15000);
-
-    function cleanup() {
-      window.clearTimeout(timeout);
-      delete window[callbackName];
-      script.remove();
-    }
-
-    window[callbackName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
-
-    try {
-      const url = new URL(baseUrl);
-      Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-      url.searchParams.set("callback", callbackName);
-      script.src = url.toString();
-      script.onerror = () => {
-        cleanup();
-        reject(new Error("JSONP request failed."));
-      };
-      document.body.appendChild(script);
-    } catch (error) {
-      cleanup();
-      reject(error);
-    }
-  });
-}
-
-function getSessionUser() {
-  const username = localStorage.getItem(SESSION_KEY);
-  return USERS.find((user) => user.username === username) || null;
-}
-
-function getUserStorageKey(username) {
-  return `${STORAGE_PREFIX}${username}`;
-}
-
-function getEffectiveSettings() {
-  const appConfig = readAppConfig();
-  const dataSettings = state.data?.settings && typeof state.data.settings === "object" ? state.data.settings : {};
-  const merged = {
-    ...defaultData.settings,
-    ...dataSettings,
-    ...appConfig,
-  };
-
-  if (GOOGLE_WEB_APP_URL) {
-    merged.sheetWebAppUrl = GOOGLE_WEB_APP_URL;
-    merged.sheetSyncEnabled = true;
-  }
-
-  return merged;
-}
-
-function applyEffectiveSettingsToData(data) {
-  const safeData = ensureDataShape(data);
-  safeData.settings = getEffectiveSettings();
-  return safeData;
-}
-
-function readAppConfig() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(APP_CONFIG_KEY) || "{}");
-    return saved && typeof saved === "object" ? saved : {};
-  } catch (error) {
-    return {};
-  }
-}
-
-function saveAppConfig(settings) {
-  localStorage.setItem(APP_CONFIG_KEY, JSON.stringify({
-    sheetWebAppUrl: settings.sheetWebAppUrl || "",
-    sheetSecret: settings.sheetSecret || defaultData.settings.sheetSecret,
-    sheetSyncEnabled: Boolean(settings.sheetSyncEnabled),
-  }));
-}
-
-function ensureDataShape(data) {
-  const safe = data && typeof data === "object" ? data : {};
-  return {
-    budgets: safe.budgets && typeof safe.budgets === "object" ? safe.budgets : {},
-    settings: {
-      ...defaultData.settings,
-      ...(safe.settings && typeof safe.settings === "object" ? safe.settings : {}),
+      },
     },
-    categories: Array.isArray(safe.categories) ? safe.categories : [],
-    expenses: Array.isArray(safe.expenses) ? safe.expenses : [],
-  };
-}
-
-function cloneData(data) {
-  return JSON.parse(JSON.stringify(data));
-}
-
-function cryptoId() {
-  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function getCurrentMonth() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  return `${now.getFullYear()}-${month}`;
-}
-
-function getCurrentDateInput() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
-function setupCurrencyInput(input) {
-  if (!input) return;
-
-  input.addEventListener("input", () => {
-    input.value = formatRupiahInput(input.value);
   });
 
-  input.addEventListener("blur", () => {
-    input.value = formatRupiahInput(input.value);
+  monthChart = new Chart(document.getElementById('monthChart'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels.length ? monthLabels : ['Belum Ada Data'],
+      datasets: [{
+        label: 'Pengeluaran',
+        data: monthValues.length ? monthValues : [0],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: (ctx) => formatter(ctx.raw) },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (value) => new Intl.NumberFormat('id-ID').format(value),
+          },
+        },
+      },
+    },
   });
 }
 
-function parseRupiahInput(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits ? Number(digits) : 0;
+function renderApp() {
+  els.sidebarUser.textContent = state.user?.username || '-';
+  els.greetingTitle.textContent = state.user ? `Halo, ${state.user.name}` : 'Halo';
+  const settingsUserLabel = document.getElementById('settingsUserLabel');
+  const settingsAvatar = document.getElementById('settingsAvatar');
+  if (settingsUserLabel) settingsUserLabel.textContent = state.user ? `${state.user.name} (@${state.user.username})` : 'Akun aktif';
+  if (settingsAvatar) settingsAvatar.textContent = (state.user?.name || 'F').slice(0, 1).toUpperCase();
+  if (els.settingsApiUrlInput) els.settingsApiUrlInput.value = state.apiUrl;
+  if (els.apiUrlInput) els.apiUrlInput.value = state.apiUrl;
+  renderStats();
+  renderCategoryOptions();
+  renderCategoryTable();
+  renderExpenseTable();
+  renderRecent();
+  renderCharts();
 }
 
-function formatRupiahInput(value) {
-  const amount = parseRupiahInput(value);
-  if (!amount) return "";
-  return `Rp ${numberFormatter.format(amount)}`;
+function resetCategoryForm() {
+  els.categoryFormTitle.textContent = 'Tambah Kategori';
+  els.categoryIdInput.value = '';
+  els.categoryNameInput.value = '';
+  els.categoryBudgetInput.value = '';
+  els.cancelCategoryEditBtn.classList.add('hidden');
 }
 
-function formatRupiah(value) {
-  const amount = Number(value || 0);
-  const sign = amount < 0 ? "-" : "";
-  return `${sign}Rp ${numberFormatter.format(Math.abs(amount))}`;
-}
-
-function formatDate(dateString) {
-  if (!dateString) return "-";
-  return shortDateFormatter.format(new Date(`${dateString}T00:00:00`));
-}
-
-function formatMonthLabel(month) {
-  const date = new Date(`${month}-01T00:00:00`);
-  return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+function resetExpenseForm() {
+  els.expenseFormTitle.textContent = 'Tambah Pengeluaran';
+  els.expenseIdInput.value = '';
+  els.expenseTitleInput.value = '';
+  els.expenseAmountInput.value = '';
+  els.expenseCategoryInput.value = state.data.categories[0]?.id || '';
+  els.expenseDateInput.value = today();
+  els.expenseNoteInput.value = '';
+  els.cancelExpenseEditBtn.classList.add('hidden');
 }
 
 function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function toast(message) {
-  els.toast.textContent = message;
-  els.toast.classList.add("show");
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => els.toast.classList.remove("show"), 2400);
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, '&#096;');
 }
 
-window.editCategory = editCategory;
-window.deleteCategory = deleteCategory;
-window.editExpense = editExpense;
-window.deleteExpense = deleteExpense;
+els.loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  clearMessage();
+
+  try {
+    const apiUrl = normalizeApiUrl(state.apiUrl || els.apiUrlInput?.value || window.FINANCEFLOW_API_URL || '');
+    if (apiUrl) saveApiUrl(apiUrl);
+    const username = els.usernameInput.value.trim().toLowerCase();
+    const password = els.passwordInput.value.trim();
+    if (!apiUrl) throw new Error('Server aplikasi belum aktif. Hubungi admin.');
+    await login(username, password);
+  } catch (error) {
+    if (String(error.message || '').toLowerCase().includes('server')) openConnectionDetails();
+    setMessage(error.message, 'error');
+  }
+});
+
+if (els.testApiBtn) {
+  els.testApiBtn.addEventListener('click', async () => {
+    saveApiUrl(els.apiUrlInput?.value || state.apiUrl);
+    await testApiConnection();
+  });
+}
+
+els.logoutBtn.addEventListener('click', () => {
+  clearSession();
+  showLoginPage();
+  showToast('Logout berhasil.');
+});
+
+els.refreshBtn.addEventListener('click', loadDataFromCloud);
+
+els.budgetForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  state.data.budget = parseRupiah(els.budgetInput.value);
+  renderApp();
+  await saveDataToCloud(true);
+  showToast('Budget tersimpan.');
+});
+
+els.categoryForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = els.categoryIdInput.value || uid('cat');
+  const payload = {
+    id,
+    name: els.categoryNameInput.value.trim(),
+    budget: parseRupiah(els.categoryBudgetInput.value),
+    createdAt: state.data.categories.find((cat) => cat.id === id)?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!payload.name) return showToast('Nama kategori wajib diisi.');
+
+  const index = state.data.categories.findIndex((cat) => cat.id === id);
+  if (index >= 0) state.data.categories[index] = payload;
+  else state.data.categories.push(payload);
+
+  resetCategoryForm();
+  renderApp();
+  await saveDataToCloud(true);
+  showToast('Kategori tersimpan.');
+});
+
+els.cancelCategoryEditBtn.addEventListener('click', resetCategoryForm);
+
+els.categoryTable.addEventListener('click', async (event) => {
+  const editId = event.target.dataset.editCategory;
+  const deleteId = event.target.dataset.deleteCategory;
+
+  if (editId) {
+    const cat = state.data.categories.find((item) => item.id === editId);
+    if (!cat) return;
+    els.categoryFormTitle.textContent = 'Edit Kategori';
+    els.categoryIdInput.value = cat.id;
+    els.categoryNameInput.value = cat.name;
+    els.categoryBudgetInput.value = cat.budget ? rupiah(cat.budget) : '';
+    els.cancelCategoryEditBtn.classList.remove('hidden');
+    switchSection('categorySection');
+  }
+
+  if (deleteId) {
+    const cat = state.data.categories.find((item) => item.id === deleteId);
+    if (!cat) return;
+    const used = state.data.expenses.some((expense) => expense.categoryId === deleteId);
+    const message = used
+      ? `Kategori "${cat.name}" sudah dipakai di pengeluaran. Tetap hapus?`
+      : `Hapus kategori "${cat.name}"?`;
+    if (!confirm(message)) return;
+    state.data.categories = state.data.categories.filter((item) => item.id !== deleteId);
+    renderApp();
+    await saveDataToCloud(true);
+    showToast('Kategori dihapus.');
+  }
+});
+
+els.expenseForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.data.categories.length) return showToast('Buat kategori dulu sebelum mencatat pengeluaran.');
+
+  const id = els.expenseIdInput.value || uid('exp');
+  const payload = {
+    id,
+    title: els.expenseTitleInput.value.trim(),
+    amount: parseRupiah(els.expenseAmountInput.value),
+    categoryId: els.expenseCategoryInput.value,
+    date: els.expenseDateInput.value || today(),
+    note: els.expenseNoteInput.value.trim(),
+    createdAt: state.data.expenses.find((expense) => expense.id === id)?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!payload.title) return showToast('Nama pengeluaran wajib diisi.');
+  if (!payload.amount) return showToast('Nominal pengeluaran wajib diisi.');
+  if (!payload.categoryId) return showToast('Kategori wajib dipilih.');
+
+  const index = state.data.expenses.findIndex((expense) => expense.id === id);
+  if (index >= 0) state.data.expenses[index] = payload;
+  else state.data.expenses.push(payload);
+
+  resetExpenseForm();
+  renderApp();
+  await saveDataToCloud(true);
+  showToast('Pengeluaran tersimpan.');
+});
+
+els.cancelExpenseEditBtn.addEventListener('click', resetExpenseForm);
+
+els.expenseTable.addEventListener('click', async (event) => {
+  const editId = event.target.dataset.editExpense;
+  const deleteId = event.target.dataset.deleteExpense;
+
+  if (editId) {
+    const expense = state.data.expenses.find((item) => item.id === editId);
+    if (!expense) return;
+    els.expenseFormTitle.textContent = 'Edit Pengeluaran';
+    els.expenseIdInput.value = expense.id;
+    els.expenseTitleInput.value = expense.title;
+    els.expenseAmountInput.value = rupiah(expense.amount);
+    els.expenseCategoryInput.value = expense.categoryId;
+    els.expenseDateInput.value = expense.date || today();
+    els.expenseNoteInput.value = expense.note || '';
+    els.cancelExpenseEditBtn.classList.remove('hidden');
+    switchSection('expenseSection');
+  }
+
+  if (deleteId) {
+    const expense = state.data.expenses.find((item) => item.id === deleteId);
+    if (!expense) return;
+    if (!confirm(`Hapus pengeluaran "${expense.title}"?`)) return;
+    state.data.expenses = state.data.expenses.filter((item) => item.id !== deleteId);
+    renderApp();
+    await saveDataToCloud(true);
+    showToast('Pengeluaran dihapus.');
+  }
+});
+
+els.searchExpenseInput.addEventListener('input', renderExpenseTable);
+els.filterCategoryInput.addEventListener('change', renderExpenseTable);
+
+if (els.apiForm) {
+  els.apiForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveApiUrl(els.settingsApiUrlInput?.value || state.apiUrl);
+    showToast('Pengaturan tersimpan.');
+  });
+}
+
+if (els.settingsTestBtn) {
+  els.settingsTestBtn.addEventListener('click', async () => {
+    saveApiUrl(els.settingsApiUrlInput?.value || state.apiUrl);
+    await testApiConnection();
+  });
+}
+
+els.exportBtn.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ user: state.user, data: state.data }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `financeflow-${state.user?.username || 'data'}-${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+els.importInput.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    state.data = sanitizeLoadedData(parsed.data || parsed);
+    renderApp();
+    await saveDataToCloud(true);
+    showToast('Import berhasil dan data tersimpan online.');
+  } catch (error) {
+    showToast('File JSON tidak valid.');
+  } finally {
+    event.target.value = '';
+  }
+});
+
+[els.budgetInput, els.categoryBudgetInput, els.expenseAmountInput].forEach((input) => {
+  input.addEventListener('input', () => {
+    const caretEnd = input.selectionStart === input.value.length;
+    input.value = formatNumberOnly(input.value);
+    if (caretEnd) input.selectionStart = input.selectionEnd = input.value.length;
+  });
+  input.addEventListener('blur', () => formatRupiahInput(input));
+});
+
+
+document.querySelectorAll('[data-fill-account]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-fill-account]').forEach((item) => item.classList.remove('active'));
+    btn.classList.add('active');
+    els.usernameInput.value = btn.dataset.fillAccount || '';
+    els.passwordInput.value = btn.dataset.fillPassword || '';
+    clearMessage();
+  });
+});
+
+document.querySelectorAll('.nav-link').forEach((btn) => {
+  btn.addEventListener('click', () => switchSection(btn.dataset.target));
+});
+
+document.querySelectorAll('[data-jump]').forEach((btn) => {
+  btn.addEventListener('click', () => switchSection(btn.dataset.jump));
+});
+
+function init() {
+  if (els.apiUrlInput) els.apiUrlInput.value = state.apiUrl;
+  if (els.settingsApiUrlInput) els.settingsApiUrlInput.value = state.apiUrl;
+  els.expenseDateInput.value = today();
+  updateConnectionUi();
+  // Pengaturan server tidak dibuka otomatis agar halaman login tetap sederhana untuk pengguna.
+
+  if (state.token && state.user && state.apiUrl) {
+    showMainPage();
+    renderApp();
+    loadDataFromCloud();
+  } else {
+    showLoginPage();
+  }
+}
+
+init();

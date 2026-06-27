@@ -1,0 +1,21 @@
+{
+  "name": "financeflow-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend API FinanceFlow untuk GitHub Pages + MongoDB Atlas",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.12.0"
+  },
+  "devDependencies": {
+    "vercel": "^39.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,13 @@
+Copy satu per satu ke Vercel > Project > Settings > Environment Variables
+
+Name: MONGODB_URI
+Value: mongodb+srv://root:12345@cluster0.ymm5jbe.mongodb.net/?appName=Cluster0
+
+Name: MONGODB_DB
+Value: financeflow
+
+Name: JWT_SECRET
+Value: financeflow_rahasia_ganti_nanti_123456789
+
+Name: CLIENT_ORIGIN
+Value: *

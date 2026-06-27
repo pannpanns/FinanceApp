@@ -3,349 +3,300 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FinanceFlow - Catatan Keuangan</title>
+  <title>FinanceFlow</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main>
-    <section id="loginPage" class="auth-page">
-      <div class="auth-decoration one"></div>
-      <div class="auth-decoration two"></div>
+  <div class="app-shell">
+    <section id="loginPage" class="login-page clean-login">
+      <div class="bg-orb bg-orb-left"></div>
+      <div class="bg-orb bg-orb-right"></div>
 
-      <div class="auth-card">
-        <div class="brand">
-          <div class="brand-logo">F</div>
+      <div class="login-card simple-card">
+        <div class="login-brand-main">
+          <div class="login-logo-main">F</div>
           <div>
             <h1>FinanceFlow</h1>
             <p>Kelola budget dan pengeluaran harian.</p>
           </div>
         </div>
 
-        <form id="loginForm" class="auth-form">
+        <form id="loginForm" class="stack clean-login-form">
           <label>
             Username
-            <input type="text" id="username" placeholder="Masukkan username" autocomplete="username" required />
+            <input id="usernameInput" type="text" placeholder="Masukkan username" autocomplete="username" required />
           </label>
           <label>
             Password
-            <input type="password" id="password" placeholder="Masukkan password" autocomplete="current-password" required />
+            <input id="passwordInput" type="password" placeholder="Masukkan password" autocomplete="current-password" required />
           </label>
-          <button type="submit" class="btn btn-primary full">Masuk</button>
-          <p id="loginError" class="form-error"></p>
+
+          <input id="apiUrlInput" type="hidden" autocomplete="off" />
+          <button class="btn primary big" type="submit">Masuk</button>
+          <button class="hidden" id="testApiBtn" type="button">Cek Server</button>
         </form>
+
+        <div id="loginMessage" class="message hidden"></div>
       </div>
     </section>
 
-    <section id="appPage" class="app hidden">
+    <section id="mainPage" class="main-page hidden">
       <aside class="sidebar">
-        <div class="sidebar-brand">
-          <div class="brand-logo small">F</div>
+        <div class="logo">
+          <div class="logo-icon">ƒ</div>
           <div>
-            <h2>FinanceFlow</h2>
-            <p>Personal Budget</p>
+            <strong>FinanceFlow</strong>
+            <small>Keuangan Online</small>
           </div>
         </div>
-
-        <nav class="nav-menu">
-          <a href="#dashboard" class="nav-link active" data-target="dashboardSection">Dashboard</a>
-          <a href="#budget" class="nav-link" data-target="budgetSection">Budget</a>
-          <a href="#kategori" class="nav-link" data-target="categorySection">Kategori</a>
-          <a href="#pengeluaran" class="nav-link" data-target="expenseSection">Pengeluaran</a>
-          <a href="#spreadsheet" class="nav-link" data-target="sheetSection">Spreadsheet</a>
-          <a href="#backup" class="nav-link" data-target="backupSection">Backup</a>
+        <nav>
+          <button class="nav-link active" data-target="dashboardSection">Dashboard</button>
+          <button class="nav-link" data-target="budgetSection">Budget</button>
+          <button class="nav-link" data-target="categorySection">Kategori</button>
+          <button class="nav-link" data-target="expenseSection">Pengeluaran</button>
+          <button class="nav-link" data-target="settingsSection">Pengaturan</button>
         </nav>
-
-        <button id="logoutBtn" class="btn btn-ghost full">Keluar</button>
+        <div class="sidebar-footer">
+          <small>Login sebagai</small>
+          <strong id="sidebarUser">-</strong>
+          <button id="logoutBtn" class="btn danger small">Logout</button>
+        </div>
       </aside>
 
-      <section class="content">
+      <main class="content">
         <header class="topbar">
           <div>
-            <p class="eyebrow" id="welcomeUser">Selamat datang, Eka</p>
-            <h1>Catatan Keuangan</h1>
+            <p class="eyebrow">Ringkasan Keuangan</p>
+            <h1 id="greetingTitle">Halo</h1>
           </div>
-          <div class="topbar-actions">
-            <select id="monthFilter" aria-label="Filter bulan"></select>
-            <button id="openExpenseShortcut" class="btn btn-primary">+ Pengeluaran</button>
+          <div class="top-actions">
+            <button id="refreshBtn" class="btn ghost">Muat Data</button>
+            <span id="syncStatus" class="sync-status">Siap</span>
           </div>
         </header>
 
-        <section id="dashboardSection" class="page-section active-section">
-          <div class="summary-grid">
-            <article class="summary-card">
+        <section id="dashboardSection" class="page-section active">
+          <div class="stats-grid">
+            <article class="stat-card">
               <span>Total Budget</span>
-              <h3 id="summaryBudget">Rp 0</h3>
-              <p>Anggaran bulan terpilih</p>
+              <strong id="statBudget">Rp 0</strong>
+              <small>Budget bulanan kamu</small>
             </article>
-            <article class="summary-card">
-              <span>Total Pengeluaran</span>
-              <h3 id="summaryExpense">Rp 0</h3>
-              <p>Akumulasi pengeluaran</p>
+            <article class="stat-card">
+              <span>Budget Terpakai</span>
+              <strong id="statSpent">Rp 0</strong>
+              <small>Total pengeluaran</small>
             </article>
-            <article class="summary-card">
+            <article class="stat-card">
               <span>Sisa Budget</span>
-              <h3 id="summaryRemaining">Rp 0</h3>
-              <p id="remainingNote">Belum ada data</p>
+              <strong id="statRemaining">Rp 0</strong>
+              <small id="remainingNote">Aman</small>
             </article>
-            <article class="summary-card">
-              <span>Persentase Terpakai</span>
-              <h3 id="summaryPercent">0%</h3>
-              <div class="progress-bar"><div id="usageProgress"></div></div>
+            <article class="stat-card">
+              <span>Total Transaksi</span>
+              <strong id="statCount">0</strong>
+              <small>Pengeluaran tercatat</small>
             </article>
           </div>
 
-          <div class="dashboard-grid">
-            <article class="panel chart-panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Chart Pengeluaran</h2>
-                  <p>Pengeluaran berdasarkan kategori</p>
-                </div>
-              </div>
-              <div class="chart-wrap">
-                <canvas id="expenseChart" width="420" height="300"></canvas>
-              </div>
-              <div id="chartLegend" class="chart-legend"></div>
-            </article>
+          <div class="progress-card">
+            <div class="progress-head">
+              <strong>Progress Budget</strong>
+              <span id="budgetPercent">0%</span>
+            </div>
+            <div class="progress-track"><div id="budgetBar" class="progress-fill"></div></div>
+          </div>
 
+          <div class="grid-2">
             <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Pengeluaran Terbaru</h2>
-                  <p>5 transaksi terakhir bulan ini</p>
-                </div>
+              <div class="panel-head">
+                <h3>Pengeluaran per Kategori</h3>
               </div>
-              <div id="latestExpenses" class="latest-list"></div>
+              <canvas id="categoryChart" height="240"></canvas>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Pengeluaran per Bulan</h3>
+              </div>
+              <canvas id="monthChart" height="240"></canvas>
             </article>
           </div>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Pengeluaran Terbaru</h3>
+              <button class="btn small" data-jump="expenseSection">Tambah Pengeluaran</button>
+            </div>
+            <div id="recentList" class="recent-list"></div>
+          </article>
         </section>
 
         <section id="budgetSection" class="page-section">
-          <article class="panel form-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Atur Budget Bulanan</h2>
-                <p>Budget akan disimpan untuk bulan yang dipilih.</p>
-              </div>
+          <article class="panel narrow">
+            <div class="panel-head">
+              <h3>Atur Budget Bulanan</h3>
             </div>
-            <form id="budgetForm" class="form-grid">
-              <label>
-                Bulan
-                <input type="month" id="budgetMonth" required />
-              </label>
+            <form id="budgetForm" class="stack">
               <label>
                 Nominal Budget
-                <input type="text" id="budgetAmount" class="currency-input" inputmode="numeric" autocomplete="off" placeholder="Contoh: Rp 2.500.000" required />
+                <input id="budgetInput" inputmode="numeric" placeholder="Rp 0" />
               </label>
-              <button type="submit" class="btn btn-primary">Simpan Budget</button>
+              <button class="btn primary" type="submit">Simpan Budget</button>
             </form>
           </article>
         </section>
 
         <section id="categorySection" class="page-section">
-          <article class="panel form-panel">
-            <div class="panel-header">
-              <div>
-                <h2>CRUD Kategori</h2>
-                <p>Buat kategori sesuai kebutuhan, seperti Makan, Transportasi, atau Belanja.</p>
+          <div class="grid-2 align-start">
+            <article class="panel">
+              <div class="panel-head">
+                <h3 id="categoryFormTitle">Tambah Kategori</h3>
               </div>
-            </div>
-            <form id="categoryForm" class="form-grid">
-              <input type="hidden" id="categoryId" />
-              <label>
-                Nama Kategori
-                <input type="text" id="categoryName" placeholder="Contoh: Makan" required />
-              </label>
-              <label>
-                Warna Kategori
-                <input type="color" id="categoryColor" value="#6366f1" />
-              </label>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary" id="categorySubmitBtn">Tambah Kategori</button>
-                <button type="button" class="btn btn-light hidden" id="cancelCategoryEdit">Batal Edit</button>
-              </div>
-            </form>
-          </article>
+              <form id="categoryForm" class="stack">
+                <input type="hidden" id="categoryIdInput" />
+                <label>
+                  Nama Kategori
+                  <input id="categoryNameInput" placeholder="Contoh: Makan, Transportasi" required />
+                </label>
+                <label>
+                  Budget Kategori Opsional
+                  <input id="categoryBudgetInput" inputmode="numeric" placeholder="Rp 0" />
+                </label>
+                <div class="row-actions">
+                  <button class="btn primary" type="submit">Simpan Kategori</button>
+                  <button class="btn ghost hidden" id="cancelCategoryEditBtn" type="button">Batal Edit</button>
+                </div>
+              </form>
+            </article>
 
-          <article class="panel table-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Daftar Kategori</h2>
-                <p>Klik edit atau hapus untuk mengelola kategori.</p>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Daftar Kategori</h3>
               </div>
-            </div>
-            <div class="table-responsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Warna</th>
-                    <th>Kategori</th>
-                    <th>Total Pengeluaran</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="categoryTable"></tbody>
-              </table>
-            </div>
-          </article>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kategori</th>
+                      <th>Budget</th>
+                      <th>Terpakai</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="categoryTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
         </section>
 
         <section id="expenseSection" class="page-section">
-          <article class="panel form-panel">
-            <div class="panel-header">
-              <div>
-                <h2>CRUD Pengeluaran</h2>
-                <p>Catat pengeluaran berdasarkan kategori yang sudah dibuat.</p>
+          <div class="grid-2 align-start">
+            <article class="panel">
+              <div class="panel-head">
+                <h3 id="expenseFormTitle">Tambah Pengeluaran</h3>
               </div>
-            </div>
-            <form id="expenseForm" class="form-grid expense-form">
-              <input type="hidden" id="expenseId" />
-              <label>
-                Tanggal
-                <input type="date" id="expenseDate" required />
-              </label>
-              <label>
-                Kategori
-                <select id="expenseCategory" required></select>
-              </label>
-              <label>
-                Nama Pengeluaran
-                <input type="text" id="expenseTitle" placeholder="Contoh: Makan siang" required />
-              </label>
-              <label>
-                Nominal
-                <input type="text" id="expenseAmount" class="currency-input" inputmode="numeric" autocomplete="off" placeholder="Contoh: Rp 25.000" required />
-              </label>
-              <label class="wide">
-                Catatan
-                <textarea id="expenseNote" placeholder="Opsional"></textarea>
-              </label>
-              <div class="form-actions wide">
-                <button type="submit" class="btn btn-primary" id="expenseSubmitBtn">Tambah Pengeluaran</button>
-                <button type="button" class="btn btn-light hidden" id="cancelExpenseEdit">Batal Edit</button>
-              </div>
-            </form>
-          </article>
+              <form id="expenseForm" class="stack">
+                <input type="hidden" id="expenseIdInput" />
+                <label>
+                  Nama Pengeluaran
+                  <input id="expenseTitleInput" placeholder="Contoh: Makan siang" required />
+                </label>
+                <label>
+                  Nominal
+                  <input id="expenseAmountInput" inputmode="numeric" placeholder="Rp 0" required />
+                </label>
+                <label>
+                  Kategori
+                  <select id="expenseCategoryInput" required></select>
+                </label>
+                <label>
+                  Tanggal
+                  <input id="expenseDateInput" type="date" required />
+                </label>
+                <label>
+                  Catatan Opsional
+                  <textarea id="expenseNoteInput" rows="3" placeholder="Catatan singkat"></textarea>
+                </label>
+                <div class="row-actions">
+                  <button class="btn primary" type="submit">Simpan Pengeluaran</button>
+                  <button class="btn ghost hidden" id="cancelExpenseEditBtn" type="button">Batal Edit</button>
+                </div>
+              </form>
+            </article>
 
-          <article class="panel table-panel">
-            <div class="panel-header list-header">
-              <div>
-                <h2>Daftar Pengeluaran</h2>
-                <p>Data yang tampil mengikuti bulan terpilih.</p>
+            <article class="panel">
+              <div class="panel-head table-filter-head">
+                <h3>Riwayat Pengeluaran</h3>
+                <div class="filters">
+                  <input id="searchExpenseInput" placeholder="Cari..." />
+                  <select id="filterCategoryInput"></select>
+                </div>
               </div>
-              <input type="search" id="expenseSearch" placeholder="Cari pengeluaran..." />
-            </div>
-            <div class="table-responsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tanggal</th>
-                    <th>Nama</th>
-                    <th>Kategori</th>
-                    <th>Nominal</th>
-                    <th>Catatan</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="expenseTable"></tbody>
-              </table>
-            </div>
-          </article>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tanggal</th>
+                      <th>Nama</th>
+                      <th>Kategori</th>
+                      <th>Nominal</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="expenseTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
         </section>
 
+        <section id="settingsSection" class="page-section">
+          <div class="grid-2 align-start">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Informasi Akun</h3>
+              </div>
+              <div class="account-info-card">
+                <div class="avatar-circle" id="settingsAvatar">F</div>
+                <div>
+                  <strong id="settingsUserLabel">Akun aktif</strong>
+                  <small>Data budget, kategori, dan pengeluaran tersimpan online sesuai akun yang sedang login.</small>
+                </div>
+              </div>
+            </article>
 
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Backup Data</h3>
+              </div>
+              <div class="stack">
+                <button id="exportBtn" class="btn">Export JSON</button>
+                <label class="file-label">
+                  Import JSON
+                  <input id="importInput" type="file" accept="application/json" />
+                </label>
+                <small class="muted">Import akan mengganti data akun yang sedang login, lalu menyimpannya secara online.</small>
+              </div>
+            </article>
+          </div>
 
-        <section id="sheetSection" class="page-section">
-          <article class="panel form-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Integrasi Google Spreadsheet</h2>
-                <p>Aktifkan cloud mode agar data akun bisa dibuka dari perangkat mana saja melalui Google Spreadsheet.</p>
-              </div>
-            </div>
-            <form id="sheetForm" class="form-grid sheet-form">
-              <label class="wide">
-                URL Google Apps Script Web App
-                <input type="url" id="sheetWebAppUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec" />
-              </label>
-              <label>
-                Secret Key
-                <input type="text" id="sheetSecret" placeholder="Contoh: eka-finance-secret" />
-              </label>
-              <label class="toggle-row">
-                <input type="checkbox" id="sheetSyncEnabled" />
-                <span>Aktifkan sinkronisasi otomatis</span>
-              </label>
-              <div class="form-actions wide">
-                <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
-                <button type="button" id="testSheetBtn" class="btn btn-light">Test Kirim ke Sheet</button>
-                <button type="button" id="loadCloudBtn" class="btn btn-light">Muat Data Akun dari Sheet</button>
-                <button type="button" id="syncAllBtn" class="btn btn-light">Kirim Semua Pengeluaran</button>
-                <button type="button" id="openSheetDashboardBtn" class="btn btn-light">Buka Dashboard Script</button>
-              </div>
-            </form>
-            <div id="sheetStatus" class="sync-status"></div>
-          </article>
-
-          <article class="panel guide-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Cara Pakai Integrasi</h2>
-                <p>File ZIP ini sudah dilengkapi kode Google Apps Script. Copy file <strong>google-apps-script.gs</strong> ke Apps Script yang terhubung dengan Spreadsheet kamu, deploy sebagai Web App, lalu tempel URL Web App di form ini.</p>
-              </div>
-            </div>
-            <div class="guide-grid">
-              <div class="guide-card">
-                <strong>1. Buat Google Spreadsheet</strong>
-                <span>Buat spreadsheet kosong, lalu buka Extensions → Apps Script.</span>
-              </div>
-              <div class="guide-card">
-                <strong>2. Pasang Apps Script</strong>
-                <span>Copy kode dari file google-apps-script.gs dan samakan Secret Key.</span>
-              </div>
-              <div class="guide-card">
-                <strong>3. Deploy Web App</strong>
-                <span>Pilih Deploy → New deployment → Web app → Anyone.</span>
-              </div>
-              <div class="guide-card">
-                <strong>4. Cloud Akun</strong>
-                <span>Budget, kategori, dan pengeluaran disimpan per username di sheet UsersData.</span>
-              </div>
-              <div class="guide-card">
-                <strong>5. Tempel URL</strong>
-                <span>Masukkan URL /exec, aktifkan sinkronisasi, lalu klik Muat Data Akun dari Sheet.</span>
-              </div>
-            </div>
-          </article>
+          <form id="apiForm" class="hidden">
+            <input id="settingsApiUrlInput" type="url" />
+            <button id="settingsTestBtn" type="button">Test</button>
+          </form>
         </section>
-
-        <section id="backupSection" class="page-section">
-          <article class="panel form-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Backup Data</h2>
-                <p>Jika cloud mode aktif, Google Spreadsheet menjadi penyimpanan utama per akun. Export/import JSON tetap disediakan sebagai backup tambahan.</p>
-              </div>
-            </div>
-            <div class="backup-actions">
-              <button id="exportBtn" class="btn btn-primary">Export Data JSON</button>
-              <label class="btn btn-light import-label">
-                Import Data JSON
-                <input type="file" id="importInput" accept="application/json" />
-              </label>
-              <button id="resetBtn" class="btn btn-danger">Reset Semua Data</button>
-            </div>
-          </article>
-        </section>
-      </section>
+      </main>
     </section>
+  </div>
 
-    <div id="toast" class="toast"></div>
-  </main>
+  <div id="toast" class="toast hidden"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

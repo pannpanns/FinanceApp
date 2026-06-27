@@ -93,6 +93,7 @@ const els = {
   sheetStatus: document.getElementById("sheetStatus"),
   testSheetBtn: document.getElementById("testSheetBtn"),
   syncAllBtn: document.getElementById("syncAllBtn"),
+  openSheetDashboardBtn: document.getElementById("openSheetDashboardBtn"),
 };
 
 init();
@@ -143,6 +144,7 @@ function bindEvents() {
   els.sheetForm.addEventListener("submit", handleSheetSettingsSubmit);
   els.testSheetBtn.addEventListener("click", testSheetSync);
   els.syncAllBtn.addEventListener("click", syncAllExpensesToSheet);
+  els.openSheetDashboardBtn.addEventListener("click", openSheetDashboard);
 
   window.addEventListener("resize", () => drawExpenseChart());
 }
@@ -724,8 +726,19 @@ function renderSheetSettings() {
   const ready = isSheetSyncEnabled();
   els.sheetStatus.className = `sync-status ${ready ? "success" : "warning"}`;
   els.sheetStatus.innerHTML = ready
-    ? "Sinkronisasi aktif. Setiap tambah, update, atau hapus pengeluaran akan dikirim ke Google Spreadsheet."
+    ? `Sinkronisasi aktif. Setiap tambah, update, atau hapus pengeluaran akan dikirim ke Google Spreadsheet.<br><a class="sync-link" href="${escapeHtml(settings.sheetWebAppUrl)}" target="_blank" rel="noopener">Buka dashboard modern Apps Script</a>`
     : "Sinkronisasi belum aktif. Isi URL Web App, samakan Secret Key, lalu aktifkan sinkronisasi.";
+}
+
+function openSheetDashboard() {
+  const url = els.sheetWebAppUrl.value.trim() || state.data.settings?.sheetWebAppUrl || "";
+
+  if (!url) {
+    toast("Isi URL Web App terlebih dahulu.");
+    return;
+  }
+
+  window.open(url, "_blank", "noopener");
 }
 
 function isSheetSyncEnabled() {

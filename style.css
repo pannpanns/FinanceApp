@@ -753,3 +753,15 @@ td {
     grid-template-columns: 1fr;
   }
 }
+
+.sync-link {
+  display: inline-flex;
+  margin-top: 6px;
+  color: var(--primary-dark);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.sync-link:hover {
+  text-decoration: underline;
+}

@@ -38,9 +38,7 @@ const state = {
   isLoadingCloud: false,
 };
 
-const rupiahFormatter = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
+const numberFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
@@ -157,6 +155,9 @@ function bindEvents() {
   els.syncAllBtn.addEventListener("click", syncAllExpensesToSheet);
   els.openSheetDashboardBtn.addEventListener("click", openSheetDashboard);
 
+  setupCurrencyInput(els.budgetAmount);
+  setupCurrencyInput(els.expenseAmount);
+
   window.addEventListener("resize", () => drawExpenseChart());
 }
 
@@ -235,7 +236,7 @@ function switchSection(sectionId) {
 function handleBudgetSubmit(event) {
   event.preventDefault();
   const month = els.budgetMonth.value;
-  const amount = Number(els.budgetAmount.value);
+  const amount = parseRupiahInput(els.budgetAmount.value);
 
   if (!month || amount < 0) {
     toast("Budget tidak valid.");
@@ -338,7 +339,7 @@ async function handleExpenseSubmit(event) {
     date: els.expenseDate.value,
     categoryId: els.expenseCategory.value,
     title: els.expenseTitle.value.trim(),
-    amount: Number(els.expenseAmount.value),
+    amount: parseRupiahInput(els.expenseAmount.value),
     note: els.expenseNote.value.trim(),
   };
 
@@ -390,7 +391,7 @@ function editExpense(id) {
   els.expenseDate.value = expense.date;
   els.expenseCategory.value = expense.categoryId;
   els.expenseTitle.value = expense.title;
-  els.expenseAmount.value = expense.amount;
+  els.expenseAmount.value = formatRupiahInput(expense.amount);
   els.expenseNote.value = expense.note || "";
   els.expenseSubmitBtn.textContent = "Update Pengeluaran";
   els.cancelExpenseEdit.classList.remove("hidden");
@@ -437,7 +438,7 @@ function renderAll() {
 
 function renderBudgetForm() {
   els.budgetMonth.value = state.activeMonth;
-  els.budgetAmount.value = state.data.budgets[state.activeMonth] || "";
+  els.budgetAmount.value = formatRupiahInput(state.data.budgets[state.activeMonth] || "");
 }
 
 function renderSummary() {
@@ -1061,8 +1062,33 @@ function getCurrentDateInput() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+function setupCurrencyInput(input) {
+  if (!input) return;
+
+  input.addEventListener("input", () => {
+    input.value = formatRupiahInput(input.value);
+  });
+
+  input.addEventListener("blur", () => {
+    input.value = formatRupiahInput(input.value);
+  });
+}
+
+function parseRupiahInput(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
+}
+
+function formatRupiahInput(value) {
+  const amount = parseRupiahInput(value);
+  if (!amount) return "";
+  return `Rp ${numberFormatter.format(amount)}`;
+}
+
 function formatRupiah(value) {
-  return rupiahFormatter.format(Number(value || 0));
+  const amount = Number(value || 0);
+  const sign = amount < 0 ? "-" : "";
+  return `${sign}Rp ${numberFormatter.format(Math.abs(amount))}`;
 }
 
 function formatDate(dateString) {

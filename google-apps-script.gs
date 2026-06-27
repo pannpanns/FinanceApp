@@ -146,6 +146,12 @@ function parsePayload_(e) {
 }
 
 function setupSpreadsheet_(spreadsheet) {
+  try {
+    spreadsheet.setSpreadsheetLocale('id_ID');
+  } catch (error) {
+    // Jika akun Google belum mengizinkan perubahan locale, format web tetap aman.
+  }
+
   const expenseSheet = ensureSheet_(spreadsheet, EXPENSE_SHEET_NAME, EXPENSE_HEADERS);
   const logSheet = ensureSheet_(spreadsheet, LOG_SHEET_NAME, LOG_HEADERS);
   const userDataSheet = ensureSheet_(spreadsheet, USER_DATA_SHEET_NAME, USER_DATA_HEADERS);
@@ -861,7 +867,7 @@ function buildDashboardHtml_(data) {
     th, td { padding: 13px 12px; border-bottom: 1px solid var(--line); text-align:left; vertical-align:top; }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing:.06em; }
     td { font-weight: 700; }
-    .money { color: var(--primary-dark); font-weight: 900; }
+    .money { color: var(--primary-dark); font-weight: 900; white-space: nowrap; }
     .status { display:inline-flex; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; }
     .status.active { color:#166534; background:#dcfce7; }
     .status.deleted { color:#991b1b; background:#fee2e2; }
@@ -889,8 +895,8 @@ function buildDashboardHtml_(data) {
     </section>
 
     <section class="cards">
-      <div class="card"><span>Total Pengeluaran</span><strong id="totalActive">Rp0</strong></div>
-      <div class="card"><span>Bulan Ini</span><strong id="monthTotal">Rp0</strong></div>
+      <div class="card"><span>Total Pengeluaran</span><strong id="totalActive">Rp 0</strong></div>
+      <div class="card"><span>Bulan Ini</span><strong id="monthTotal">Rp 0</strong></div>
       <div class="card"><span>Transaksi Aktif</span><strong id="activeCount">0</strong></div>
       <div class="card"><span>Kategori Terbesar</span><strong id="topCategory">-</strong></div>
     </section>
@@ -946,7 +952,13 @@ function buildDashboardHtml_(data) {
 
   <script>
     const DATA = ${dataJson};
-    const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+    const numberFormatter = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+
+    function formatRupiah(value) {
+      const amount = Number(value || 0);
+      const sign = amount < 0 ? '-' : '';
+      return sign + 'Rp ' + numberFormatter.format(Math.abs(amount));
+    }
 
     function escapeHtml(value) {
       return String(value ?? '')
@@ -960,8 +972,8 @@ function buildDashboardHtml_(data) {
     function render() {
       document.getElementById('subtitle').textContent = 'Update terakhir: ' + DATA.generatedAt + ' · ' + DATA.spreadsheetName;
       document.getElementById('sheetLink').href = DATA.spreadsheetUrl;
-      document.getElementById('totalActive').textContent = rupiah.format(DATA.totalActive || 0);
-      document.getElementById('monthTotal').textContent = rupiah.format(DATA.currentMonthTotal || 0);
+      document.getElementById('totalActive').textContent = formatRupiah(DATA.totalActive || 0);
+      document.getElementById('monthTotal').textContent = formatRupiah(DATA.currentMonthTotal || 0);
       document.getElementById('activeCount').textContent = DATA.activeCount || 0;
       document.getElementById('topCategory').textContent = DATA.topCategory && DATA.topCategory.name ? DATA.topCategory.name : '-';
       renderBars('categoryBars', DATA.categoryTotals || []);
@@ -980,7 +992,7 @@ function buildDashboardHtml_(data) {
         const width = Math.max(4, (Number(item.total || 0) / max) * 100);
         const label = isMonth ? monthLabel(item.name) : item.name;
         return '<div class="bar-item">'
-          + '<div class="bar-top"><span>' + escapeHtml(label) + '</span><span class="money">' + rupiah.format(item.total || 0) + '</span></div>'
+          + '<div class="bar-top"><span>' + escapeHtml(label) + '</span><span class="money">' + formatRupiah(item.total || 0) + '</span></div>'
           + '<div class="bar-bg"><div class="bar-fill" style="width:' + width + '%"></div></div>'
           + '</div>';
       }).join('');
@@ -1006,7 +1018,7 @@ function buildDashboardHtml_(data) {
           + '<td>' + escapeHtml(item.user || '-') + '</td>'
           + '<td>' + escapeHtml(item.category || '-') + '</td>'
           + '<td>' + escapeHtml(item.title || '-') + '</td>'
-          + '<td class="money">' + rupiah.format(item.amount || 0) + '</td>'
+          + '<td class="money">' + formatRupiah(item.amount || 0) + '</td>'
           + '<td>' + escapeHtml(item.note || '-') + '</td>'
           + '<td><span class="status ' + statusClass + '">' + escapeHtml(item.status || 'ACTIVE') + '</span></td>'
           + '</tr>';

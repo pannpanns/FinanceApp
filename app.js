@@ -57,10 +57,23 @@ const STORAGE = {
   apiUrl: 'financeflow_api_url',
 };
 
+function getInitialApiUrl() {
+  const configured = normalizeApiUrl(window.FINANCEFLOW_API_URL || '');
+  if (configured) return configured;
+
+  // Jika frontend dibuka dari Vercel, API ada di domain yang sama.
+  if (location.hostname.includes('vercel.app') || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    return normalizeApiUrl(location.origin);
+  }
+
+  // Jika masih dibuka dari GitHub Pages, pakai fallback backend Vercel.
+  return normalizeApiUrl(window.FINANCEFLOW_FALLBACK_API_URL || localStorage.getItem(STORAGE.apiUrl) || '');
+}
+
 let state = {
   token: localStorage.getItem(STORAGE.token) || '',
   user: JSON.parse(localStorage.getItem(STORAGE.user) || 'null'),
-  apiUrl: window.FINANCEFLOW_API_URL || localStorage.getItem(STORAGE.apiUrl) || '',
+  apiUrl: getInitialApiUrl(),
   data: {
     budget: 0,
     categories: [],
@@ -68,11 +81,9 @@ let state = {
   },
 };
 
-// Paksa pakai URL dari config.js agar tidak tertimpa URL lama yang tersimpan di browser.
-if (window.FINANCEFLOW_API_URL) {
-  state.apiUrl = normalizeApiUrl(window.FINANCEFLOW_API_URL);
-  localStorage.setItem(STORAGE.apiUrl, state.apiUrl);
-}
+// Paksa pakai URL hasil konfigurasi terbaru agar tidak tertimpa URL lama dari browser.
+state.apiUrl = getInitialApiUrl();
+if (state.apiUrl) localStorage.setItem(STORAGE.apiUrl, state.apiUrl);
 
 let categoryChart = null;
 let monthChart = null;
@@ -602,7 +613,8 @@ els.loginForm.addEventListener('submit', async (event) => {
     await login(username, password);
   } catch (error) {
     if (String(error.message || '').toLowerCase().includes('server')) openConnectionDetails();
-    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Pastikan file terbaru sudah dipush ke GitHub dan backend Vercel sudah di-Redeploy.' : error.message, 'error');
+    console.error('LOGIN_ERROR:', error);
+    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Buka aplikasi dari URL Vercel utama, atau pastikan config.js mengarah ke backend Vercel yang benar.' : error.message, 'error');
   }
 });
 

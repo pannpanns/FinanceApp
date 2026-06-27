@@ -21,10 +21,13 @@ let cachedClient = null;
 let cachedDb = null;
 
 function setCors(req, res) {
+  // Untuk GitHub Pages -> Vercel. Tidak memakai cookie, jadi '*' aman untuk mode ini.
+  const origin = req.headers.origin || '*';
   const allowedOrigin = CLIENT_ORIGIN === '*' ? '*' : CLIENT_ORIGIN;
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin === '*' ? '*' : origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 

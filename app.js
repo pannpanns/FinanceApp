@@ -163,7 +163,7 @@ async function apiFetch(path, options = {}) {
     headers.Authorization = `Bearer ${state.token}`;
   }
 
-  const response = await fetch(`${base}/api${path}`, {
+  const response = await fetch(`${base}${path}`, {
     ...options,
     headers,
   });
@@ -187,7 +187,7 @@ async function testApiConnection() {
     const base = getApiUrl();
     if (!base) throw new Error('Server aplikasi belum diatur.');
     updateConnectionUi('checking');
-    const response = await fetch(`${base}/api/health`);
+    const response = await fetch(`${base}/health`);
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.message || 'Koneksi gagal.');
     updateConnectionUi('ready');
@@ -592,7 +592,7 @@ els.loginForm.addEventListener('submit', async (event) => {
     await login(username, password);
   } catch (error) {
     if (String(error.message || '').toLowerCase().includes('server')) openConnectionDetails();
-    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Coba refresh halaman, lalu pastikan config.js sudah terupload dan URL backend benar.' : error.message, 'error');
+    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa masuk. Coba refresh halaman sekali lagi. Jika masih gagal, admin perlu redeploy backend Vercel versi terbaru.' : error.message, 'error');
   }
 });
 

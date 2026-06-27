@@ -1,10 +1,11 @@
-const CREDENTIALS = {
-  username: "eka",
-  password: "eka123",
-};
+const USERS = [
+  { username: "eka", password: "eka123", name: "Eka" },
+  { username: "tes", password: "tes123", name: "Tes" },
+];
 
-const STORAGE_KEY = "financeflow_data_v1";
-const SESSION_KEY = "financeflow_logged_in";
+const LEGACY_STORAGE_KEY = "financeflow_data_v1";
+const STORAGE_PREFIX = "financeflow_data_v2_";
+const SESSION_KEY = "financeflow_logged_in_user";
 
 const defaultData = {
   budgets: {},
@@ -22,9 +23,10 @@ const defaultData = {
 };
 
 const state = {
-  data: loadData(),
+  data: cloneData(defaultData),
   activeMonth: getCurrentMonth(),
   search: "",
+  activeUser: null,
 };
 
 const rupiahFormatter = new Intl.NumberFormat("id-ID", {
@@ -44,6 +46,7 @@ const els = {
   appPage: document.getElementById("appPage"),
   loginForm: document.getElementById("loginForm"),
   loginError: document.getElementById("loginError"),
+  welcomeUser: document.getElementById("welcomeUser"),
   logoutBtn: document.getElementById("logoutBtn"),
   navLinks: document.querySelectorAll(".nav-link"),
   sections: document.querySelectorAll(".page-section"),
@@ -95,13 +98,11 @@ const els = {
 init();
 
 function init() {
-  state.data = ensureDataShape(state.data);
-  saveData();
   bindEvents();
+  showCorrectPageBySession();
   fillMonthOptions();
   els.budgetMonth.value = state.activeMonth;
   els.expenseDate.value = getCurrentDateInput();
-  showCorrectPageBySession();
   renderAll();
 }
 
@@ -150,12 +151,22 @@ function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
+  const user = USERS.find((item) => item.username === username && item.password === password);
 
-  if (username === CREDENTIALS.username && password === CREDENTIALS.password) {
-    localStorage.setItem(SESSION_KEY, "true");
+  if (user) {
+    localStorage.setItem(SESSION_KEY, user.username);
+    state.activeUser = user;
+    state.data = ensureDataShape(loadData());
+    state.activeMonth = getCurrentMonth();
+    state.search = "";
+    saveData();
+    fillMonthOptions();
+    resetCategoryForm();
+    resetExpenseForm();
+    renderAll();
     els.loginError.textContent = "";
     showApp();
-    toast("Login berhasil. Selamat datang, Eka!");
+    toast(`Login berhasil. Selamat datang, ${user.name}!`);
   } else {
     els.loginError.textContent = "Username atau password salah.";
   }
@@ -163,15 +174,26 @@ function handleLogin(event) {
 
 function handleLogout() {
   localStorage.removeItem(SESSION_KEY);
+  state.activeUser = null;
+  state.data = cloneData(defaultData);
+  state.activeMonth = getCurrentMonth();
+  state.search = "";
   els.loginForm.reset();
   els.loginPage.classList.remove("hidden");
   els.appPage.classList.add("hidden");
 }
 
 function showCorrectPageBySession() {
-  if (localStorage.getItem(SESSION_KEY) === "true") {
+  const user = getSessionUser();
+
+  if (user) {
+    state.activeUser = user;
+    state.data = ensureDataShape(loadData());
+    saveData();
     showApp();
   } else {
+    state.activeUser = null;
+    state.data = cloneData(defaultData);
     els.loginPage.classList.remove("hidden");
     els.appPage.classList.add("hidden");
   }
@@ -180,6 +202,9 @@ function showCorrectPageBySession() {
 function showApp() {
   els.loginPage.classList.add("hidden");
   els.appPage.classList.remove("hidden");
+  if (els.welcomeUser && state.activeUser) {
+    els.welcomeUser.textContent = `Selamat datang, ${state.activeUser.name}`;
+  }
 }
 
 function switchSection(sectionId) {
@@ -784,7 +809,7 @@ async function postToGoogleSheet(payload) {
       body: JSON.stringify({
         secret: settings.sheetSecret,
         app: "FinanceFlow",
-        username: CREDENTIALS.username,
+        username: state.activeUser?.username || "",
         sentAt: new Date().toISOString(),
         ...payload,
       }),
@@ -798,8 +823,19 @@ async function postToGoogleSheet(payload) {
 }
 
 function loadData() {
+  const user = state.activeUser || getSessionUser();
+  if (!user) return cloneData(defaultData);
+
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const storageKey = getUserStorageKey(user.username);
+    let saved = localStorage.getItem(storageKey);
+
+    // Migrasi data versi lama ke akun eka agar data sebelumnya tetap aman.
+    if (!saved && user.username === "eka") {
+      saved = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (saved) localStorage.setItem(storageKey, saved);
+    }
+
     return saved ? JSON.parse(saved) : cloneData(defaultData);
   } catch (error) {
     return cloneData(defaultData);
@@ -807,7 +843,18 @@ function loadData() {
 }
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  const user = state.activeUser || getSessionUser();
+  if (!user) return;
+  localStorage.setItem(getUserStorageKey(user.username), JSON.stringify(state.data));
+}
+
+function getSessionUser() {
+  const username = localStorage.getItem(SESSION_KEY);
+  return USERS.find((user) => user.username === username) || null;
+}
+
+function getUserStorageKey(username) {
+  return `${STORAGE_PREFIX}${username}`;
 }
 
 function ensureDataShape(data) {

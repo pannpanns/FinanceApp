@@ -154,19 +154,29 @@ async function apiFetch(path, options = {}) {
   const base = getApiUrl();
   if (!base) throw new Error('Aplikasi belum siap digunakan. Hubungi admin untuk mengaktifkan server.');
 
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-  };
+  // Pakai endpoint /api agar cocok dengan pola bawaan Vercel.
+  let finalPath = path.startsWith('/api') ? path : `/api${path}`;
 
+  // Token dikirim lewat query untuk menghindari Authorization header.
+  // Ini membuat request dari GitHub Pages menjadi simple request dan tidak kena preflight CORS.
   if (state.token) {
-    headers.Authorization = `Bearer ${state.token}`;
+    finalPath += `${finalPath.includes('?') ? '&' : '?'}token=${encodeURIComponent(state.token)}`;
   }
 
-  const response = await fetch(`${base}${path}`, {
-    ...options,
-    headers,
-  });
+  const requestOptions = {
+    method: options.method || 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+  };
+
+  if (options.body !== undefined) {
+    requestOptions.headers = {
+      'Content-Type': 'text/plain;charset=UTF-8',
+    };
+    requestOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+  }
+
+  const response = await fetch(`${base}${finalPath}`, requestOptions);
 
   let data = {};
   try {
@@ -187,7 +197,7 @@ async function testApiConnection() {
     const base = getApiUrl();
     if (!base) throw new Error('Server aplikasi belum diatur.');
     updateConnectionUi('checking');
-    const response = await fetch(`${base}/health`);
+    const response = await fetch(`${base}/api/health`, { cache: 'no-store', mode: 'cors' });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.message || 'Koneksi gagal.');
     updateConnectionUi('ready');
@@ -592,7 +602,7 @@ els.loginForm.addEventListener('submit', async (event) => {
     await login(username, password);
   } catch (error) {
     if (String(error.message || '').toLowerCase().includes('server')) openConnectionDetails();
-    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa masuk. Coba refresh halaman sekali lagi. Jika masih gagal, admin perlu redeploy backend Vercel versi terbaru.' : error.message, 'error');
+    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Pastikan file terbaru sudah dipush ke GitHub dan backend Vercel sudah di-Redeploy.' : error.message, 'error');
   }
 });
 

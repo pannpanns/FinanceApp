@@ -27,7 +27,7 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin === '*' ? '*' : origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 
@@ -73,6 +73,10 @@ function createToken(username) {
 }
 
 function getToken(req) {
+  const url = new URL(req.url, 'http://localhost');
+  const queryToken = url.searchParams.get('token');
+  if (queryToken) return queryToken;
+
   const auth = req.headers.authorization || req.headers.Authorization || '';
   if (!auth.startsWith('Bearer ')) return null;
   return auth.slice(7);

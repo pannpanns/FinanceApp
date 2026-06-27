@@ -1,13 +1,14 @@
-# FinanceFlow MongoDB - Final CORS Fix
+# FinanceFlow MongoDB - No Preflight Fix
 
-Versi ini memperbaiki masalah login dari GitHub Pages ke backend Vercel yang muncul sebagai `Failed to fetch` / tidak bisa terhubung ke server.
+Versi ini memperbaiki login GitHub Pages ke Vercel dengan cara menghindari preflight CORS.
 
-## Yang diubah
+## Perubahan penting
 
-- Frontend sekarang memanggil endpoint root Vercel seperti `/login`, `/data`, dan `/health`.
-- Backend tetap mendukung `/api/login`, `/api/data`, dan `/api/health`.
-- Header CORS ditambahkan di `backend/vercel.json` dan di `backend/api/index.js`.
-- URL backend sudah diisi di `config.js`:
+- Frontend memakai endpoint `/api/login`, `/api/data`, dan `/api/health`.
+- Request login/data dikirim sebagai `text/plain` agar tidak memicu preflight CORS.
+- Token dikirim lewat query agar request dari GitHub Pages lebih stabil.
+- Backend sudah bisa membaca token dari query atau Authorization header.
+- `config.js` sudah diisi:
 
 ```js
 window.FINANCEFLOW_API_URL = 'https://finance-app-vann2.vercel.app';
@@ -15,13 +16,13 @@ window.FINANCEFLOW_API_URL = 'https://finance-app-vann2.vercel.app';
 
 ## Cara update
 
-1. Upload/push semua file ke GitHub.
-2. Pastikan Vercel project tetap memakai Root Directory: `backend`.
-3. Di Vercel, lakukan Redeploy.
-4. Tunggu GitHub Pages selesai update.
-5. Buka web lalu tekan `Ctrl + F5`.
+1. Push semua file ini ke GitHub.
+2. Pastikan Vercel Root Directory tetap `backend`.
+3. Redeploy backend di Vercel.
+4. Tunggu GitHub Pages update.
+5. Buka halaman dengan `Ctrl + F5`.
 
 ## Login
 
-- eka / eka123
-- tes / tes123
+- `eka / eka123`
+- `tes / tes123`

@@ -1,4 +1,3 @@
-// Isi URL backend Vercel kamu di sini setelah backend berhasil dideploy.
-// Contoh: window.FINANCEFLOW_API_URL = 'https://financeflow-backend.vercel.app';
-// Kalau masih kosong, nanti bisa diisi dari halaman login.
+// URL backend Vercel sudah diisi.
+// Kalau backend berubah, ganti URL di bawah ini.
 window.FINANCEFLOW_API_URL = 'https://finance-app-vann2.vercel.app';

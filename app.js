@@ -60,13 +60,19 @@ const STORAGE = {
 let state = {
   token: localStorage.getItem(STORAGE.token) || '',
   user: JSON.parse(localStorage.getItem(STORAGE.user) || 'null'),
-  apiUrl: localStorage.getItem(STORAGE.apiUrl) || window.FINANCEFLOW_API_URL || '',
+  apiUrl: window.FINANCEFLOW_API_URL || localStorage.getItem(STORAGE.apiUrl) || '',
   data: {
     budget: 0,
     categories: [],
     expenses: [],
   },
 };
+
+// Paksa pakai URL dari config.js agar tidak tertimpa URL lama yang tersimpan di browser.
+if (window.FINANCEFLOW_API_URL) {
+  state.apiUrl = normalizeApiUrl(window.FINANCEFLOW_API_URL);
+  localStorage.setItem(STORAGE.apiUrl, state.apiUrl);
+}
 
 let categoryChart = null;
 let monthChart = null;
@@ -141,7 +147,7 @@ function normalizeApiUrl(url) {
 }
 
 function getApiUrl() {
-  return normalizeApiUrl(state.apiUrl || els.apiUrlInput?.value || els.settingsApiUrlInput?.value || window.FINANCEFLOW_API_URL || '');
+  return normalizeApiUrl(window.FINANCEFLOW_API_URL || state.apiUrl || els.apiUrlInput?.value || els.settingsApiUrlInput?.value || '');
 }
 
 async function apiFetch(path, options = {}) {
@@ -578,7 +584,7 @@ els.loginForm.addEventListener('submit', async (event) => {
   clearMessage();
 
   try {
-    const apiUrl = normalizeApiUrl(state.apiUrl || els.apiUrlInput?.value || window.FINANCEFLOW_API_URL || '');
+    const apiUrl = normalizeApiUrl(window.FINANCEFLOW_API_URL || state.apiUrl || els.apiUrlInput?.value || '');
     if (apiUrl) saveApiUrl(apiUrl);
     const username = els.usernameInput.value.trim().toLowerCase();
     const password = els.passwordInput.value.trim();
@@ -586,7 +592,7 @@ els.loginForm.addEventListener('submit', async (event) => {
     await login(username, password);
   } catch (error) {
     if (String(error.message || '').toLowerCase().includes('server')) openConnectionDetails();
-    setMessage(error.message, 'error');
+    setMessage(error.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Coba refresh halaman, lalu pastikan config.js sudah terupload dan URL backend benar.' : error.message, 'error');
   }
 });
 

@@ -10,6 +10,8 @@ const els = {
   connectionDetails: document.getElementById('connectionDetails'),
   connectionStatusText: document.getElementById('connectionStatusText'),
   sidebarUser: document.getElementById('sidebarUser'),
+  mobileGreeting: document.getElementById('mobileGreeting'),
+  mobileLogoutBtn: document.getElementById('mobileLogoutBtn'),
   greetingTitle: document.getElementById('greetingTitle'),
   logoutBtn: document.getElementById('logoutBtn'),
   refreshBtn: document.getElementById('refreshBtn'),
@@ -348,6 +350,9 @@ function switchSection(targetId) {
   document.querySelectorAll('.nav-link').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.target === targetId);
   });
+  if (window.innerWidth <= 760) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 function categoryName(categoryId) {
@@ -513,6 +518,7 @@ function renderCharts() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom' },
         tooltip: {
@@ -534,6 +540,7 @@ function renderCharts() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -553,6 +560,7 @@ function renderCharts() {
 
 function renderApp() {
   els.sidebarUser.textContent = state.user?.username || '-';
+  if (els.mobileGreeting) els.mobileGreeting.textContent = state.user ? `Halo, ${state.user.name}` : 'Keuangan Online';
   els.greetingTitle.textContent = state.user ? `Halo, ${state.user.name}` : 'Halo';
   const settingsUserLabel = document.getElementById('settingsUserLabel');
   const settingsAvatar = document.getElementById('settingsAvatar');
@@ -625,11 +633,14 @@ if (els.testApiBtn) {
   });
 }
 
-els.logoutBtn.addEventListener('click', () => {
+function handleLogout() {
   clearSession();
   showLoginPage();
   showToast('Logout berhasil.');
-});
+}
+
+els.logoutBtn.addEventListener('click', handleLogout);
+if (els.mobileLogoutBtn) els.mobileLogoutBtn.addEventListener('click', handleLogout);
 
 els.refreshBtn.addEventListener('click', loadDataFromCloud);
 

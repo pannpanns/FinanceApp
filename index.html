@@ -2,18 +2,19 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>FinanceFlow</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=vercel-full-1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=ui-redesign-1" />
 </head>
 <body>
   <div class="app-shell">
     <section id="loginPage" class="login-page clean-login">
       <div class="bg-orb bg-orb-left"></div>
       <div class="bg-orb bg-orb-right"></div>
+      <div class="bg-grid"></div>
 
       <div class="login-card simple-card">
         <div class="login-brand-main">
@@ -46,25 +47,38 @@
     <section id="mainPage" class="main-page hidden">
       <aside class="sidebar">
         <div class="logo">
-          <div class="logo-icon">ƒ</div>
+          <div class="logo-icon">F</div>
           <div>
             <strong>FinanceFlow</strong>
             <small>Keuangan Online</small>
           </div>
         </div>
-        <nav>
-          <button class="nav-link active" data-target="dashboardSection">Dashboard</button>
-          <button class="nav-link" data-target="budgetSection">Budget</button>
-          <button class="nav-link" data-target="categorySection">Kategori</button>
-          <button class="nav-link" data-target="expenseSection">Pengeluaran</button>
-          <button class="nav-link" data-target="settingsSection">Pengaturan</button>
+
+        <nav class="desktop-nav">
+          <button class="nav-link active" data-target="dashboardSection"><span>⌂</span>Dashboard</button>
+          <button class="nav-link" data-target="budgetSection"><span>◎</span>Budget</button>
+          <button class="nav-link" data-target="categorySection"><span>▦</span>Kategori</button>
+          <button class="nav-link" data-target="expenseSection"><span>＋</span>Pengeluaran</button>
+          <button class="nav-link" data-target="settingsSection"><span>⚙</span>Pengaturan</button>
         </nav>
+
         <div class="sidebar-footer">
           <small>Login sebagai</small>
           <strong id="sidebarUser">-</strong>
           <button id="logoutBtn" class="btn danger small">Logout</button>
         </div>
       </aside>
+
+      <header class="mobile-header">
+        <div class="mobile-brand-row">
+          <div class="mobile-logo">F</div>
+          <div>
+            <strong>FinanceFlow</strong>
+            <small id="mobileGreeting">Keuangan Online</small>
+          </div>
+        </div>
+        <button id="mobileLogoutBtn" class="mobile-logout" type="button">Logout</button>
+      </header>
 
       <main class="content">
         <header class="topbar">
@@ -80,7 +94,7 @@
 
         <section id="dashboardSection" class="page-section active">
           <div class="stats-grid">
-            <article class="stat-card">
+            <article class="stat-card stat-primary">
               <span>Total Budget</span>
               <strong id="statBudget">Rp 0</strong>
               <small>Budget bulanan kamu</small>
@@ -104,30 +118,36 @@
 
           <div class="progress-card">
             <div class="progress-head">
-              <strong>Progress Budget</strong>
+              <div>
+                <strong>Progress Budget</strong>
+                <small>Perbandingan budget dengan total pengeluaran.</small>
+              </div>
               <span id="budgetPercent">0%</span>
             </div>
             <div class="progress-track"><div id="budgetBar" class="progress-fill"></div></div>
           </div>
 
-          <div class="grid-2">
-            <article class="panel">
+          <div class="grid-2 chart-grid">
+            <article class="panel chart-panel">
               <div class="panel-head">
                 <h3>Pengeluaran per Kategori</h3>
               </div>
-              <canvas id="categoryChart" height="240"></canvas>
+              <div class="chart-box"><canvas id="categoryChart"></canvas></div>
             </article>
-            <article class="panel">
+            <article class="panel chart-panel">
               <div class="panel-head">
                 <h3>Pengeluaran per Bulan</h3>
               </div>
-              <canvas id="monthChart" height="240"></canvas>
+              <div class="chart-box"><canvas id="monthChart"></canvas></div>
             </article>
           </div>
 
           <article class="panel">
             <div class="panel-head">
-              <h3>Pengeluaran Terbaru</h3>
+              <div>
+                <h3>Pengeluaran Terbaru</h3>
+                <small>Transaksi terakhir yang kamu catat.</small>
+              </div>
               <button class="btn small" data-jump="expenseSection">Tambah Pengeluaran</button>
             </div>
             <div id="recentList" class="recent-list"></div>
@@ -135,9 +155,12 @@
         </section>
 
         <section id="budgetSection" class="page-section">
-          <article class="panel narrow">
+          <article class="panel form-card narrow">
             <div class="panel-head">
-              <h3>Atur Budget Bulanan</h3>
+              <div>
+                <h3>Atur Budget Bulanan</h3>
+                <small>Tentukan batas pengeluaran agar lebih mudah dipantau.</small>
+              </div>
             </div>
             <form id="budgetForm" class="stack">
               <label>
@@ -151,9 +174,12 @@
 
         <section id="categorySection" class="page-section">
           <div class="grid-2 align-start">
-            <article class="panel">
+            <article class="panel form-card">
               <div class="panel-head">
-                <h3 id="categoryFormTitle">Tambah Kategori</h3>
+                <div>
+                  <h3 id="categoryFormTitle">Tambah Kategori</h3>
+                  <small>Contoh: Makan, Transportasi, Belanja.</small>
+                </div>
               </div>
               <form id="categoryForm" class="stack">
                 <input type="hidden" id="categoryIdInput" />
@@ -174,10 +200,13 @@
 
             <article class="panel">
               <div class="panel-head">
-                <h3>Daftar Kategori</h3>
+                <div>
+                  <h3>Daftar Kategori</h3>
+                  <small>Lihat budget dan pemakaian tiap kategori.</small>
+                </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="data-table category-data-table">
                   <thead>
                     <tr>
                       <th>Kategori</th>
@@ -194,10 +223,13 @@
         </section>
 
         <section id="expenseSection" class="page-section">
-          <div class="grid-2 align-start">
-            <article class="panel">
+          <div class="grid-2 align-start expense-layout">
+            <article class="panel form-card">
               <div class="panel-head">
-                <h3 id="expenseFormTitle">Tambah Pengeluaran</h3>
+                <div>
+                  <h3 id="expenseFormTitle">Tambah Pengeluaran</h3>
+                  <small>Catat nominal, kategori, tanggal, dan catatan.</small>
+                </div>
               </div>
               <form id="expenseForm" class="stack">
                 <input type="hidden" id="expenseIdInput" />
@@ -228,16 +260,19 @@
               </form>
             </article>
 
-            <article class="panel">
+            <article class="panel history-panel">
               <div class="panel-head table-filter-head">
-                <h3>Riwayat Pengeluaran</h3>
+                <div>
+                  <h3>Riwayat Pengeluaran</h3>
+                  <small>Cari dan edit transaksi yang sudah dibuat.</small>
+                </div>
                 <div class="filters">
-                  <input id="searchExpenseInput" placeholder="Cari..." />
+                  <input id="searchExpenseInput" placeholder="Cari pengeluaran..." />
                   <select id="filterCategoryInput"></select>
                 </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="data-table expense-data-table">
                   <thead>
                     <tr>
                       <th>Tanggal</th>
@@ -258,20 +293,26 @@
           <div class="grid-2 align-start">
             <article class="panel">
               <div class="panel-head">
-                <h3>Informasi Akun</h3>
+                <div>
+                  <h3>Informasi Akun</h3>
+                  <small>Data disimpan online sesuai akun yang aktif.</small>
+                </div>
               </div>
               <div class="account-info-card">
                 <div class="avatar-circle" id="settingsAvatar">F</div>
                 <div>
                   <strong id="settingsUserLabel">Akun aktif</strong>
-                  <small>Data budget, kategori, dan pengeluaran tersimpan online sesuai akun yang sedang login.</small>
+                  <small>Budget, kategori, dan pengeluaran tersimpan otomatis.</small>
                 </div>
               </div>
             </article>
 
             <article class="panel">
               <div class="panel-head">
-                <h3>Backup Data</h3>
+                <div>
+                  <h3>Backup Data</h3>
+                  <small>Export atau import data dalam format JSON.</small>
+                </div>
               </div>
               <div class="stack">
                 <button id="exportBtn" class="btn">Export JSON</button>
@@ -290,13 +331,21 @@
           </form>
         </section>
       </main>
+
+      <nav class="mobile-bottom-nav" aria-label="Navigasi utama">
+        <button class="nav-link active" data-target="dashboardSection"><span>⌂</span><small>Home</small></button>
+        <button class="nav-link" data-target="budgetSection"><span>◎</span><small>Budget</small></button>
+        <button class="nav-link" data-target="categorySection"><span>▦</span><small>Kategori</small></button>
+        <button class="nav-link" data-target="expenseSection"><span>＋</span><small>Catat</small></button>
+        <button class="nav-link" data-target="settingsSection"><span>⚙</span><small>Akun</small></button>
+      </nav>
     </section>
   </div>
 
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="config.js?v=vercel-full-1"></script>
-  <script src="app.js?v=vercel-full-1"></script>
+  <script src="config.js?v=ui-redesign-1"></script>
+  <script src="app.js?v=ui-redesign-1"></script>
 </body>
 </html>

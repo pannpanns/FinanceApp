@@ -168,6 +168,7 @@ async function handleLogin(event) {
   const user = USERS.find((item) => item.username === username && item.password === password);
 
   if (user) {
+    clearTimeout(state.cloudSaveTimer);
     localStorage.setItem(SESSION_KEY, user.username);
     state.activeUser = user;
     state.data = ensureDataShape(loadData());
@@ -188,6 +189,7 @@ async function handleLogin(event) {
 }
 
 function handleLogout() {
+  clearTimeout(state.cloudSaveTimer);
   localStorage.removeItem(SESSION_KEY);
   state.activeUser = null;
   state.data = cloneData(defaultData);
@@ -772,13 +774,38 @@ async function testSheetSync() {
     return;
   }
 
+  const ping = await pingGoogleSheet();
+  if (!ping.ok) {
+    toast(ping.error || "Koneksi gagal. Pastikan URL /exec, Secret Key, dan izin deployment sudah benar.");
+    return;
+  }
+
   const result = await postToGoogleSheet({
     type: "test",
     action: "TEST",
     message: "Test koneksi dari FinanceFlow",
   });
 
-  toast(result.ok ? "Permintaan test sudah dikirim. Cek sheet Log di Spreadsheet." : "Gagal mengirim test ke Google Sheet.");
+  toast(result.ok ? "Koneksi berhasil. Cek sheet Log di Spreadsheet." : "Gagal mengirim test ke Google Sheet.");
+}
+
+async function pingGoogleSheet() {
+  const settings = getEffectiveSettings();
+
+  if (!settings.sheetWebAppUrl) {
+    return { ok: false, error: "URL Web App kosong." };
+  }
+
+  try {
+    return await jsonpRequest(settings.sheetWebAppUrl, {
+      action: "ping",
+      secret: settings.sheetSecret,
+      username: state.activeUser?.username || "",
+    });
+  } catch (error) {
+    console.error("Google Sheet ping error:", error);
+    return { ok: false, error: "Tidak bisa menghubungi Apps Script. Cek URL Web App yang berakhiran /exec." };
+  }
 }
 
 async function syncAllExpensesToSheet() {
@@ -806,7 +833,9 @@ async function syncAllExpensesToSheet() {
 
 async function syncExpenseToSheet(expense, action) {
   const category = getCategoryById(expense.categoryId);
+  const username = state.activeUser?.username || "";
   return postToGoogleSheet({
+    username,
     type: "expense",
     action,
     expense: {
@@ -831,27 +860,99 @@ async function postToGoogleSheet(payload) {
     return { ok: false, error: "URL Web App kosong." };
   }
 
-  try {
-    await fetch(settings.sheetWebAppUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8",
-      },
-      body: JSON.stringify({
-        secret: settings.sheetSecret,
-        app: "FinanceFlow",
-        username: state.activeUser?.username || "",
-        sentAt: new Date().toISOString(),
-        ...payload,
-      }),
-    });
+  const username = payload.username || state.activeUser?.username || "";
+  const fullPayload = {
+    secret: settings.sheetSecret,
+    app: "FinanceFlow",
+    sentAt: new Date().toISOString(),
+    ...payload,
+    username,
+  };
 
+  try {
+    // Hidden form POST lebih stabil untuk GitHub Pages -> Google Apps Script
+    // karena tidak terkena masalah CORS/preflight seperti fetch biasa.
+    await postToGoogleSheetByForm(settings.sheetWebAppUrl, fullPayload);
     return { ok: true };
-  } catch (error) {
-    console.error("Google Sheet sync error:", error);
-    return { ok: false, error };
+  } catch (formError) {
+    console.error("Google Sheet form sync error:", formError);
+
+    // Fallback lama. Respons tidak bisa dibaca karena no-cors, tetapi POST tetap dicoba.
+    try {
+      await fetch(settings.sheetWebAppUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+        },
+        body: JSON.stringify(fullPayload),
+      });
+      return { ok: true };
+    } catch (fetchError) {
+      console.error("Google Sheet fetch sync error:", fetchError);
+      return { ok: false, error: fetchError };
+    }
   }
+}
+
+function postToGoogleSheetByForm(url, payload) {
+  return new Promise((resolve, reject) => {
+    if (!url || !url.includes("/exec")) {
+      reject(new Error("URL Web App harus URL deployment yang berakhiran /exec."));
+      return;
+    }
+
+    const iframeName = `financeflow_post_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const iframe = document.createElement("iframe");
+    const form = document.createElement("form");
+    const textarea = document.createElement("textarea");
+    let submitted = false;
+    let finished = false;
+
+    function cleanup() {
+      window.setTimeout(() => {
+        form.remove();
+        iframe.remove();
+      }, 250);
+    }
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve({ ok: true });
+    }
+
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    iframe.onload = () => {
+      if (submitted) finish();
+    };
+
+    form.method = "POST";
+    form.action = url;
+    form.target = iframeName;
+    form.enctype = "application/x-www-form-urlencoded";
+    form.style.display = "none";
+
+    textarea.name = "payload";
+    textarea.value = JSON.stringify(payload);
+    form.appendChild(textarea);
+
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+
+    try {
+      submitted = true;
+      form.submit();
+      // Apps Script kadang tidak memicu event load di iframe karena redirect internal.
+      // Setelah form dikirim, kita anggap request sudah masuk.
+      window.setTimeout(finish, 2200);
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
 }
 
 function loadData() {
@@ -888,17 +989,23 @@ function saveData(options = {}) {
 function queueCloudSave() {
   if (state.isLoadingCloud || !state.activeUser || !isSheetSyncEnabled()) return;
 
+  const usernameSnapshot = state.activeUser.username;
+  const dataSnapshot = cloneData(state.data);
+
   clearTimeout(state.cloudSaveTimer);
   state.cloudSaveTimer = setTimeout(() => {
-    saveFullAccountDataToCloud();
+    saveFullAccountDataToCloud(usernameSnapshot, dataSnapshot);
   }, CLOUD_SAVE_DELAY);
 }
 
-async function saveFullAccountDataToCloud() {
-  if (!state.activeUser || !isSheetSyncEnabled()) return { ok: false };
+async function saveFullAccountDataToCloud(usernameOverride = null, dataOverride = null) {
+  const username = usernameOverride || state.activeUser?.username || "";
+  if (!username || !isSheetSyncEnabled()) return { ok: false };
 
-  const dataToSave = applyEffectiveSettingsToData(ensureDataShape(state.data));
+  const rawData = dataOverride || state.data;
+  const dataToSave = applyEffectiveSettingsToData(ensureDataShape(rawData));
   return postToGoogleSheet({
+    username,
     type: "userData",
     action: "SAVE_ACCOUNT_DATA",
     userData: dataToSave,
@@ -909,6 +1016,7 @@ async function loadCloudDataForActiveUser(options = {}) {
   const { force = false, showToast = false } = options;
   if (!state.activeUser) return;
 
+  const usernameSnapshot = state.activeUser.username;
   const settings = getEffectiveSettings();
   if (!settings.sheetWebAppUrl || (!settings.sheetSyncEnabled && !force)) return;
 
@@ -917,11 +1025,18 @@ async function loadCloudDataForActiveUser(options = {}) {
     const response = await jsonpRequest(settings.sheetWebAppUrl, {
       action: "load",
       secret: settings.sheetSecret,
-      username: state.activeUser.username,
+      username: usernameSnapshot,
     });
+
+    if (!state.activeUser || state.activeUser.username !== usernameSnapshot) return;
 
     if (!response || !response.ok) {
       if (showToast) toast(response?.error || "Gagal mengambil data akun dari Google Spreadsheet.");
+      return;
+    }
+
+    if (response.username && response.username !== usernameSnapshot) {
+      if (showToast) toast("Data cloud ditolak karena username tidak sesuai.");
       return;
     }
 

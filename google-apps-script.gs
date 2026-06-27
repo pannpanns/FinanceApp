@@ -11,6 +11,11 @@
  * 7. Who has access: Anyone.
  * 8. Copy Web App URL yang berakhiran /exec ke menu Spreadsheet di FinanceFlow.
  * 9. Buka URL /exec di browser untuk melihat dashboard modern.
+ *
+ * Catatan pemisahan akun:
+ * - UsersData tidak lagi membuat akun eka dan tes sekaligus.
+ * - Baris UsersData hanya dibuat untuk akun yang sedang login dan menyimpan data.
+ * - Jika spreadsheet lama sudah telanjur punya baris demo akun lain, hapus manual baris itu satu kali.
  */
 
 const SECRET_KEY = 'eka-finance-secret';
@@ -103,6 +108,27 @@ function doGet(e) {
   setupSpreadsheet_(spreadsheet);
 
   const params = (e && e.parameter) ? e.parameter : {};
+  const callback = params.callback || 'callback';
+
+  if (params.action === 'ping') {
+    if (params.secret !== SECRET_KEY) {
+      return jsonp_(callback, { ok: false, error: 'Unauthorized. Secret Key tidak cocok.' });
+    }
+
+    appendLog_(spreadsheet, {
+      type: 'ping',
+      action: 'PING',
+      username: params.username || '',
+      source: 'doGet'
+    }, 'Ping connection received.');
+
+    return jsonp_(callback, {
+      ok: true,
+      message: 'Connected.',
+      spreadsheetName: spreadsheet.getName(),
+      generatedAt: new Date().toISOString()
+    });
+  }
 
   if (params.action === 'load') {
     return handleUserDataLoad_(spreadsheet, params);
@@ -139,10 +165,50 @@ function formatFinanceFlowSheets() {
 }
 
 function parsePayload_(e) {
-  if (!e || !e.postData || !e.postData.contents) {
+  if (!e) {
     throw new Error('Payload kosong.');
   }
-  return JSON.parse(e.postData.contents);
+
+  // Metode baru dari GitHub Pages: hidden form POST mengirim field bernama "payload".
+  if (e.parameter && e.parameter.payload) {
+    return JSON.parse(String(e.parameter.payload));
+  }
+
+  // Dukungan tambahan jika payload dikirim sebagai form-urlencoded mentah.
+  if (e.postData && e.postData.contents) {
+    const raw = String(e.postData.contents || '');
+
+    try {
+      return JSON.parse(raw);
+    } catch (jsonError) {
+      const formObject = parseFormEncoded_(raw);
+      if (formObject.payload) {
+        return JSON.parse(String(formObject.payload));
+      }
+      if (Object.keys(formObject).length > 0) {
+        return formObject;
+      }
+      throw jsonError;
+    }
+  }
+
+  if (e.parameter && Object.keys(e.parameter).length > 0) {
+    return e.parameter;
+  }
+
+  throw new Error('Payload kosong.');
+}
+
+function parseFormEncoded_(raw) {
+  const result = {};
+  String(raw || '').split('&').forEach((pair) => {
+    if (!pair) return;
+    const parts = pair.split('=');
+    const key = decodeURIComponent(String(parts.shift() || '').replace(/\+/g, ' '));
+    const value = decodeURIComponent(String(parts.join('=') || '').replace(/\+/g, ' '));
+    if (key) result[key] = value;
+  });
+  return result;
 }
 
 function setupSpreadsheet_(spreadsheet) {
@@ -156,7 +222,8 @@ function setupSpreadsheet_(spreadsheet) {
   const logSheet = ensureSheet_(spreadsheet, LOG_SHEET_NAME, LOG_HEADERS);
   const userDataSheet = ensureSheet_(spreadsheet, USER_DATA_SHEET_NAME, USER_DATA_HEADERS);
   ensureDashboardSheet_(spreadsheet);
-  ensureDefaultUsers_(userDataSheet);
+  // Penting: jangan otomatis membuat baris eka + tes sekaligus.
+  // UsersData hanya dibuat/diubah untuk akun yang sedang login dan mengirim data.
   formatExpenseSheet_(expenseSheet);
   formatLogSheet_(logSheet);
   formatUserDataSheet_(userDataSheet);
@@ -188,21 +255,16 @@ function ensureDashboardSheet_(spreadsheet) {
   return sheet;
 }
 
-function ensureDefaultUsers_(sheet) {
-  DEFAULT_ACCOUNTS.forEach((account) => {
-    const row = findRowByUsername_(sheet, account.username);
-    if (!row) {
-      sheet.appendRow([
-        account.username,
-        account.name,
-        account.password,
-        JSON.stringify(defaultFinanceData_()),
-        new Date()
-      ]);
-    }
-  });
+function getAccountByUsername_(username) {
+  username = String(username || '').trim();
+  return DEFAULT_ACCOUNTS.find((item) => item.username === username) || null;
 }
 
+function requireAccount_(username) {
+  const account = getAccountByUsername_(username);
+  if (!account) throw new Error('Akun tidak terdaftar.');
+  return account;
+}
 function handleUserDataLoad_(spreadsheet, params) {
   const callback = params.callback || 'callback';
 
@@ -215,18 +277,16 @@ function handleUserDataLoad_(spreadsheet, params) {
     return jsonp_(callback, { ok: false, error: 'Username kosong.' });
   }
 
-  const account = DEFAULT_ACCOUNTS.find((item) => item.username === username);
+  const account = getAccountByUsername_(username);
   if (!account) {
     return jsonp_(callback, { ok: false, error: 'Akun tidak terdaftar.' });
   }
 
   const sheet = spreadsheet.getSheetByName(USER_DATA_SHEET_NAME);
-  let row = findRowByUsername_(sheet, username);
-  if (!row) {
-    ensureDefaultUsers_(sheet);
-    row = findRowByUsername_(sheet, username);
-  }
+  const row = findRowByUsername_(sheet, username);
 
+  // Kalau akun belum pernah menyimpan data, kembalikan data kosong untuk akun itu saja.
+  // Jangan membuat baris default untuk akun lain.
   const rawData = row ? sheet.getRange(row, 4).getValue() : '';
   let data = defaultFinanceData_();
   if (rawData) {
@@ -241,7 +301,8 @@ function handleUserDataLoad_(spreadsheet, params) {
     ok: true,
     username: username,
     data: data,
-    updatedAt: row ? formatDateTimeValue_(sheet.getRange(row, 5).getValue()) : ''
+    updatedAt: row ? formatDateTimeValue_(sheet.getRange(row, 5).getValue()) : '',
+    isNewAccountData: !row
   });
 }
 
@@ -249,8 +310,7 @@ function saveUserData_(spreadsheet, username, userData) {
   username = String(username || '').trim();
   if (!username) throw new Error('Username kosong.');
 
-  const account = DEFAULT_ACCOUNTS.find((item) => item.username === username);
-  if (!account) throw new Error('Akun tidak terdaftar.');
+  const account = requireAccount_(username);
 
   const sheet = spreadsheet.getSheetByName(USER_DATA_SHEET_NAME);
   const safeData = normalizeUserData_(userData);
@@ -345,10 +405,17 @@ function upsertExpense_(spreadsheet, payload) {
   const expense = payload.expense || {};
   const action = String(payload.action || '').toUpperCase();
   const expenseId = String(expense.id || '');
+  const username = String(payload.username || '').trim();
 
   if (!expenseId) {
     throw new Error('Expense ID kosong.');
   }
+
+  if (!username) {
+    throw new Error('Username kosong.');
+  }
+
+  requireAccount_(username);
 
   const rowValues = [
     new Date(),
@@ -362,13 +429,13 @@ function upsertExpense_(spreadsheet, payload) {
     expense.title || '',
     Number(expense.amount || 0),
     expense.note || '',
-    payload.username || '',
+    username,
     payload.sentAt || '',
     expense.createdAt || '',
     expense.updatedAt || ''
   ];
 
-  const targetRow = findRowByExpenseId_(sheet, expenseId);
+  const targetRow = findRowByExpenseIdAndUser_(sheet, expenseId, username);
 
   if (targetRow) {
     sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
@@ -379,20 +446,21 @@ function upsertExpense_(spreadsheet, payload) {
   formatExpenseSheet_(sheet);
 }
 
-function findRowByExpenseId_(sheet, expenseId) {
+function findRowByExpenseIdAndUser_(sheet, expenseId, username) {
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return null;
 
-  const ids = sheet.getRange(2, 4, lastRow - 1, 1).getValues();
-  for (let index = 0; index < ids.length; index += 1) {
-    if (String(ids[index][0]) === String(expenseId)) {
+  const values = sheet.getRange(2, 4, lastRow - 1, 9).getValues();
+  for (let index = 0; index < values.length; index += 1) {
+    const rowExpenseId = String(values[index][0]); // kolom D: Expense ID
+    const rowUsername = String(values[index][8]); // kolom L: User
+    if (rowExpenseId === String(expenseId) && rowUsername === String(username)) {
       return index + 2;
     }
   }
 
   return null;
 }
-
 function appendLog_(spreadsheet, payload, message) {
   const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
   sheet.appendRow([
